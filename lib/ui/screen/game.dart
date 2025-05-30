@@ -6,8 +6,10 @@ import 'dart:math';
 typedef OnDeleteFunc = void Function(BuildContext context, int index);
 
 class GameScreen extends StatefulWidget {
+  const GameScreen({super.key});
+
   @override
-  _GameScreenState createState() => _GameScreenState();
+  State<GameScreen> createState() => _GameScreenState();
 }
 
 class _GameScreenState extends State<GameScreen> {
@@ -54,9 +56,17 @@ class _GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Flex(
-        direction: Axis.horizontal,
-        children: [_buildMainLayout(context), _buildKeyInput(context)],
+      body: Container(
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/background.png'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Flex(
+          direction: Axis.horizontal,
+          children: [_buildMainLayout(context), _buildKeyInput(context)],
+        ),
       ),
     );
   }
@@ -141,7 +151,7 @@ class _GameScreenState extends State<GameScreen> {
     // get the first null index from input
     var index = input.indexWhere((e) => e == null);
 
-    // store the value to  input where value is missing
+    // store the value to input where value is missing
     setState(() {
       input[index] = value;
     });
@@ -263,7 +273,7 @@ class Answers extends StatelessWidget {
 
                                 Color? color;
                                 if (number < answer.onPlace) {
-                                  color = Colors.black;
+                                  color = Colors.redAccent[700];
                                 } else if (number <
                                     answer.onPlace + answer.misplaced) {
                                   color = Colors.white;
@@ -329,7 +339,7 @@ class WinComponent extends StatelessWidget {
       children: [
         const Center(
           child: Text(
-            'You Win!',
+            'Congratulations!',
             // style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
         ),
@@ -380,9 +390,11 @@ class InputComponent extends StatelessWidget {
       ),
       itemBuilder: (context, index) {
         return MaterialButton(
-          onPressed: () {
-            onDelete(context, index);
-          },
+          onPressed: () => onDelete(context, index),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          minWidth: 0,
+          height: 0,
+          padding: EdgeInsets.all(3.0),
           shape: const CircleBorder(),
           color: Colors.grey.withOpacity(0.5),
           child:

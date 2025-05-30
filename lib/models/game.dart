@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 enum GameState { playing, win }
 
 List<Color> colors = [
-  Colors.red,
-  Colors.blue,
+  // Colors.red,
+  Colors.redAccent[400]!,
   Colors.yellow,
-  Colors.pink,
-  Colors.brown,
   Colors.teal,
+  Colors.blue,
   Colors.purple,
+  Colors.brown,
 ];
 
 class KeyInputType {

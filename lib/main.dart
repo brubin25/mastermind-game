@@ -12,10 +12,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Mastermind Game',
-      theme: ThemeData(
-        primarySwatch: Colors.grey,
-        brightness: Brightness.dark,
-      ),
+      theme: ThemeData(primarySwatch: Colors.grey, brightness: Brightness.dark),
       home: const MainScaffold(),
     );
   }
@@ -27,17 +24,13 @@ class MainScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mastermind Game'),
-      ),
+      appBar: AppBar(title: const Text('Mastermind Game')),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
             const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Colors.deepPurple,
-              ),
+              decoration: BoxDecoration(color: Color(0xFF0D47A1)),
               child: Text(
                 'Menu',
                 style: TextStyle(color: Colors.white, fontSize: 24),
