@@ -3,6 +3,7 @@ import 'package:mastermind_game/models/game.dart';
 import 'package:mastermind_game/ui/screen/components/key_input.dart';
 import 'dart:math';
 
+const int maxRounds = 10;
 typedef OnDeleteFunc = void Function(BuildContext context, int index);
 
 class GameScreen extends StatefulWidget {
@@ -104,7 +105,7 @@ class _GameScreenState extends State<GameScreen> {
             ),
           ),
           Expanded(
-            flex: gameState == GameState.playing ? 1 : 2,
+            flex: gameState == GameState.playing ? 1 : 3,
             child: Container(
               padding: EdgeInsets.only(
                 top: 10.0,
@@ -112,10 +113,22 @@ class _GameScreenState extends State<GameScreen> {
                 left: 5.0,
                 right: 5.0,
               ),
-              child:
-                  (gameState == GameState.playing
-                      ? InputComponent(input: input, onDelete: handleOnDelete)
-                      : WinComponent(answers: answers, onReset: handleReset)),
+              child: () {
+                switch (gameState) {
+                  case GameState.playing:
+                    return InputComponent(
+                      input: input,
+                      onDelete: handleOnDelete,
+                    );
+                  case GameState.win:
+                    return WinComponent(answers: answers, onReset: handleReset);
+                  case GameState.lose:
+                    return LoseComponent(
+                      onReset: handleReset,
+                      secretCode: secretCode,
+                    );
+                }
+              }(),
             ),
           ),
         ],
@@ -179,8 +192,14 @@ class _GameScreenState extends State<GameScreen> {
       }
     }
 
+    // win?
     if (onPlace == secretCodeLength) {
       gameState = GameState.win;
+    }
+
+    // loss?
+    if (answers.length >= (maxRounds - 1)) {
+      gameState = GameState.lose;
     }
 
     // add the answer to the answers list, new answer will be added to the top
@@ -339,19 +358,64 @@ class WinComponent extends StatelessWidget {
       children: [
         const Center(
           child: Text(
-            'Congratulations!',
-            // style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            'Congratulations! XD',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
         ),
         Center(
           child: Text(
             'You took $length $plural to win.',
-            // style: TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w400),
           ),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            padding: EdgeInsets.symmetric(horizontal: 30.0, vertical: 20.0),
+            padding: EdgeInsets.symmetric(horizontal: 30.0, vertical: 10.0),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(32.0),
+            ),
+          ),
+          onPressed: () {
+            onReset();
+          },
+          child: const Text('Play Again'),
+        ),
+      ],
+    );
+  }
+}
+
+class LoseComponent extends StatelessWidget {
+  final Function() onReset;
+  final String secretCode;
+
+  const LoseComponent({
+    super.key,
+    required this.onReset,
+    required this.secretCode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Center(
+          child: Text(
+            'Game Over T.T',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+        ),
+        Center(
+          child: Text(
+            ' You\'ve used all $maxRounds rounds\nThe secret code was $secretCode',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+          ),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            padding: EdgeInsets.symmetric(horizontal: 30.0, vertical: 10.0),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(32.0),
             ),

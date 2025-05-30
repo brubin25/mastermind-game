@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum GameState { playing, win }
+enum GameState { playing, win, lose }
 
 List<Color> colors = [
   // Colors.red,
