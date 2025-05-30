@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mastermind_game/models/game.dart';
 import 'package:mastermind_game/ui/screen/components/key_input.dart';
+import 'dart:math';
 
 typedef OnDeleteFunc = void Function(BuildContext context, int index);
 
@@ -47,9 +48,7 @@ class _GameScreenState extends State<GameScreen> {
 
     buttons = createKeyInputTypeList(6);
     secretCodeLength = 4;
-    input = List.filled(secretCodeLength, null);
-
-    secretCode = generateRandomString(secretCodeLength);
+    handleReset();
   }
 
   @override
@@ -72,7 +71,12 @@ class _GameScreenState extends State<GameScreen> {
       flex: 2,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
-        children: [KeyInput(onPressed: handleOnPressed, children: buttons)],
+        children: [
+          Container(
+            margin: EdgeInsets.all(10.0),
+            child: KeyInput(onPressed: handleOnPressed, children: buttons),
+          ),
+        ],
       ),
     );
   }
@@ -96,18 +100,43 @@ class _GameScreenState extends State<GameScreen> {
           ),
           Expanded(
             flex: gameState == GameState.playing ? 1 : 2,
-            child:
-                (gameState == GameState.playing
-                    ? InputComponent(input: input, onDelete: handleOnDelete)
-                    : WinComponent(answers: answers, onReset: handleReset)),
+            child: Container(
+              padding: EdgeInsets.only(
+                top: 10.0,
+                bottom: 10.0,
+                left: 5.0,
+                right: 5.0,
+              ),
+              child:
+                  (gameState == GameState.playing
+                      ? InputComponent(input: input, onDelete: handleOnDelete)
+                      : WinComponent(answers: answers, onReset: handleReset)),
+            ),
           ),
         ],
       ),
     );
   }
 
-  String generateRandomString(int secretCodeLength) {
-    return '1234'; // Placeholder for the secret code generation logic
+  String generateRandomString(int secretCodeLength, bool repeatNumber) {
+    var list = buttons.map((e) => e.value).toList();
+    // remove duplicates
+    if (!repeatNumber) {
+      list.shuffle();
+      var sc = list.sublist(0, secretCodeLength).join();
+      print('Secret code: $sc');
+      return sc;
+    }
+
+    var random = Random();
+    var sb = StringBuffer();
+
+    for (var i = 0; i < secretCodeLength; i++) {
+      sb.write(list[random.nextInt(list.length)]);
+    }
+
+    print('Secret code: ${sb.toString()}');
+    return sb.toString();
   }
 
   handleOnPressed(BuildContext context, KeyInputType value) {
@@ -172,13 +201,22 @@ class _GameScreenState extends State<GameScreen> {
       input[index] = null;
     });
   }
+
+  handleReset() {
+    setState(() {
+      answers = [];
+      gameState = GameState.playing;
+      input = List.filled(secretCodeLength, null);
+      secretCode = generateRandomString(secretCodeLength, false);
+    });
+  }
 }
 
 class Answers extends StatelessWidget {
-  List<AnswerType> answers;
-  int maxDigits;
-  Answers({Key? key, required this.answers, required this.maxDigits})
-    : super(key: key);
+  final List<AnswerType> answers;
+  final int maxDigits;
+  const Answers({super.key, required this.answers, required this.maxDigits});
+
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
@@ -186,6 +224,8 @@ class Answers extends StatelessWidget {
       itemCount: answers.length,
       itemBuilder: (context, index) {
         var answer = answers[index];
+        var spaceBetween = MediaQuery.of(context).size.height * 0.001;
+        var ratio = maxDigits <= 5 ? 60 : 40;
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
           child: Column(
@@ -193,17 +233,72 @@ class Answers extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    flex: 7,
-                    child: Text(answer.input.map((e) => e.value).join('')),
+                    flex: 8,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children:
+                          answers[index].input
+                              .map(
+                                (e) => SizedBox(
+                                  width: spaceBetween * ratio,
+                                  height: spaceBetween * ratio,
+                                  child: ElementButton(keyInputType: e),
+                                ),
+                              )
+                              .toList(),
+                    ),
+                    // child: Text(answer.input.map((e) => e.value).join('')),
                   ),
                   Expanded(
-                    flex: 3,
+                    flex: 2,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Text('onPlace: ' + answer.onPlace.toString()),
-                        Text('misplaced: ' + answer.misplaced.toString()),
+                        ...List.generate(2, (rowIndex) {
+                          var maxForRow = maxDigits ~/ 2;
+                          if (maxDigits.isOdd && rowIndex == 0) {
+                            maxForRow++;
+                          }
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              ...List.generate(maxForRow, (columnIndex) {
+                                var number = rowIndex * maxForRow + columnIndex;
+
+                                Color? color;
+                                if (number < answer.onPlace) {
+                                  color = Colors.black;
+                                } else if (number <
+                                    answer.onPlace + answer.misplaced) {
+                                  color = Colors.white;
+                                }
+
+                                return Container(
+                                  width: 14,
+                                  height: 14,
+                                  margin: EdgeInsets.only(top: 5),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color:
+                                        color != null
+                                            ? Colors.grey
+                                            : Colors.transparent,
+                                  ),
+                                  child: Container(
+                                    margin: EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: color,
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                          );
+                        }),
+                        // Text('onPlace: ' + answer.onPlace.toString()),
+                        // Text('misplaced: ' + answer.misplaced.toString()),
                       ],
                     ),
                   ),
@@ -226,8 +321,7 @@ class WinComponent extends StatelessWidget {
   final List<AnswerType> answers;
   final Function() onReset;
 
-  WinComponent({Key? key, required this.answers, required this.onReset})
-    : super(key: key);
+  const WinComponent({super.key, required this.answers, required this.onReset});
 
   @override
   Widget build(BuildContext context) {
@@ -252,7 +346,10 @@ class WinComponent extends StatelessWidget {
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            padding: EdgeInsets.symmetric(vertical: 20.0, horizontal: 30.0),
+            padding: EdgeInsets.symmetric(horizontal: 30.0, vertical: 20.0),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(32.0),
+            ),
           ),
           onPressed: () {
             onReset();
@@ -265,11 +362,14 @@ class WinComponent extends StatelessWidget {
 }
 
 class InputComponent extends StatelessWidget {
-  List<KeyInputType?> input;
+  final List<KeyInputType?> input;
   final OnDeleteFunc onDelete;
 
-  InputComponent({Key? key, required this.input, required this.onDelete})
-    : super(key: key);
+  const InputComponent({
+    super.key,
+    required this.input,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -280,6 +380,8 @@ class InputComponent extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 1,
+        mainAxisSpacing: 10.0,
+        // crossAxisSpacing: 20.0,
       ),
       itemBuilder: (context, index) {
         return MaterialButton(
@@ -288,7 +390,10 @@ class InputComponent extends StatelessWidget {
           },
           shape: const CircleBorder(),
           color: Colors.grey.withOpacity(0.5),
-          child: input[index] != null ? Text(input[index]!.value) : null,
+          child:
+              input[index] != null
+                  ? ElementButton(keyInputType: input[index]!)
+                  : null,
         );
       },
     );
