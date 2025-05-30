@@ -54,11 +54,6 @@ class _GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent.withOpacity(0.5),
-        elevation: 0,
-        leading: IconButton(onPressed: null, icon: Icon(Icons.arrow_back)),
-      ),
       body: Flex(
         direction: Axis.horizontal,
         children: [_buildMainLayout(context), _buildKeyInput(context)],
