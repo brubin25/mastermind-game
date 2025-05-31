@@ -64,9 +64,11 @@ class _GameScreenState extends State<GameScreen> {
             fit: BoxFit.cover,
           ),
         ),
-        child: Flex(
-          direction: Axis.horizontal,
-          children: [_buildMainLayout(context), _buildKeyInput(context)],
+        child: SafeArea(
+          child: Flex(
+            direction: Axis.horizontal,
+            children: [_buildMainLayout(context), _buildKeyInput(context)],
+          ),
         ),
       ),
     );
