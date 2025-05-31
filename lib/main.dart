@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'ui/screen/login_screen.dart';
 import 'ui/screen/game.dart';
 import 'ui/screen/record_screen.dart';
+import 'ui/screen/leaderboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,7 +64,11 @@ class MainScaffold extends StatelessWidget {
               decoration: BoxDecoration(color: Color(0xFF0D47A1)),
               child: Text(
                 'Menu',
-                style: TextStyle(color: Colors.white, fontSize: 24),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 38,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             ListTile(
@@ -80,6 +85,18 @@ class MainScaffold extends StatelessWidget {
                 Navigator.pop(context);
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (context) => const RecordScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.emoji_events),
+              title: const Text('Leaderboard'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const LeaderboardScreen(),
+                  ),
                 );
               },
             ),
