@@ -216,6 +216,23 @@ class _GameScreenState extends State<GameScreen> {
       ];
     });
 
+    // update game steps
+    try {
+      await _currentGameRef.update({
+        'steps': FieldValue.arrayUnion([
+          {
+            'input': guess,
+            'onPlace': onPlace,
+            'misplaced': misplaced,
+            'createdAt':
+                DateTime.now().millisecondsSinceEpoch, // local timestamp
+          },
+        ]),
+      });
+    } catch (e) {
+      print('Error updating game steps: $e');
+    }
+
     // win
     if (onPlace == secretCodeLength) {
       _roundTimer?.cancel();
@@ -270,6 +287,7 @@ class _GameScreenState extends State<GameScreen> {
         'secretCode': newCode,
         'codeLength': secretCodeLength,
         'createdAt': FieldValue.serverTimestamp(),
+        'steps': [],
         // add remaining time later when the user wins
       });
     } catch (e) {
