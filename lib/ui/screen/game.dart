@@ -43,7 +43,7 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
 
-    buttons = createKeyInputTypeList(6);
+    buttons = createKeyInputTypeList(9);
     secretCodeLength = 4;
     _startNewGame();
   }
@@ -97,12 +97,16 @@ class _GameScreenState extends State<GameScreen> {
           // timer ui
           Container(
             padding: const EdgeInsets.symmetric(vertical: 8.0),
-            color: Colors.black54,
+            color: Colors.transparent,
             width: double.infinity,
             child: Center(
               child: Text(
                 'Time Remaining: $_timeRemainingSec s',
-                style: const TextStyle(color: Colors.white, fontSize: 18),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -201,7 +205,7 @@ class _GameScreenState extends State<GameScreen> {
 
     // update answers, gameState, and reset input
     setState(() {
-      // new guess
+      // new answer
       answers = [
         AnswerType(
           input: input.map((e) => e!).toList(),
@@ -252,7 +256,7 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Future<void> _startNewGame() async {
-    // generate a new secretCode
+    // generate a new secret code
     final newCode = generateRandomString(secretCodeLength, false);
 
     try {
@@ -261,11 +265,12 @@ class _GameScreenState extends State<GameScreen> {
       final uid = currentUser?.uid;
 
       _currentGameRef = await gamesRef.add({
-        'createdAt': FieldValue.serverTimestamp(),
         if (uid != null) 'uid': uid,
+        'email': FirebaseAuth.instance.currentUser!.email,
         'secretCode': newCode,
         'codeLength': secretCodeLength,
-        // add remainingTime later when the user wins
+        'createdAt': FieldValue.serverTimestamp(),
+        // add remaining time later when the user wins
       });
     } catch (e) {
       print('Error writing secretCode to Firestore: $e');
