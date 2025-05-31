@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mastermind_game/models/game.dart';
 import 'package:mastermind_game/ui/screen/components/key_input.dart';
 import 'dart:math';
@@ -18,32 +21,23 @@ class _GameScreenState extends State<GameScreen> {
   GameState gameState = GameState.playing;
   List<KeyInputType?> input = [];
 
-  List<AnswerType> answers = [
-    AnswerType(
-      input: [
-        KeyInputType(value: '2'),
-        KeyInputType(value: '2'),
-        KeyInputType(value: '3'),
-        KeyInputType(value: '4'),
-      ],
-      onPlace: 2,
-      misplaced: 2,
-    ),
-
-    AnswerType(
-      input: [
-        KeyInputType(value: '5'),
-        KeyInputType(value: '4'),
-        KeyInputType(value: '3'),
-        KeyInputType(value: '2'),
-      ],
-      onPlace: 3,
-      misplaced: 0,
-    ),
-  ];
+  List<AnswerType> answers = [];
 
   late int secretCodeLength;
   late String secretCode;
+  final CollectionReference gamesRef = FirebaseFirestore.instance.collection(
+    'games',
+  );
+  late DocumentReference _currentGameRef;
+
+  // seconds per round
+  static const int _initialTimeSec = 300;
+  // time remaining
+  int _timeRemainingSec = _initialTimeSec;
+  Timer? _roundTimer;
+
+  // show elapsed time instead of countdown
+  // final Stopwatch _stopwatch = Stopwatch();
 
   @override
   void initState() {
@@ -51,7 +45,13 @@ class _GameScreenState extends State<GameScreen> {
 
     buttons = createKeyInputTypeList(6);
     secretCodeLength = 4;
-    handleReset();
+    _startNewGame();
+  }
+
+  @override
+  void dispose() {
+    _roundTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -94,6 +94,19 @@ class _GameScreenState extends State<GameScreen> {
       flex: 8,
       child: Column(
         children: [
+          // timer ui
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            color: Colors.black54,
+            width: double.infinity,
+            child: Center(
+              child: Text(
+                'Time Remaining: $_timeRemainingSec s',
+                style: const TextStyle(color: Colors.white, fontSize: 18),
+              ),
+            ),
+          ),
+
           Expanded(
             flex: gameState == GameState.playing ? 9 : 8,
             child: Container(
@@ -123,10 +136,13 @@ class _GameScreenState extends State<GameScreen> {
                       onDelete: handleOnDelete,
                     );
                   case GameState.win:
-                    return WinComponent(answers: answers, onReset: handleReset);
+                    return WinComponent(
+                      answers: answers,
+                      onReset: _startNewGame,
+                    );
                   case GameState.lose:
                     return LoseComponent(
-                      onReset: handleReset,
+                      onReset: _startNewGame,
                       secretCode: secretCode,
                     );
                 }
@@ -159,62 +175,69 @@ class _GameScreenState extends State<GameScreen> {
     return sb.toString();
   }
 
-  handleOnPressed(BuildContext context, KeyInputType value) {
-    if (gameState != GameState.playing) {
-      return;
-    }
-    // get the first null index from input
-    var index = input.indexWhere((e) => e == null);
+  Future<void> handleOnPressed(BuildContext context, KeyInputType value) async {
+    if (gameState != GameState.playing) return;
 
-    // store the value to input where value is missing
+    // fill empty slot
+    final index = input.indexWhere((e) => e == null);
     setState(() {
       input[index] = value;
     });
 
-    // check if all inputs are filled
-    var count = input.where((e) => e != null).length;
-    if (count < secretCodeLength) {
-      return;
-    }
+    // check if all slots are filled
+    final filledCount = input.where((e) => e != null).length;
+    if (filledCount < secretCodeLength) return;
 
-    // create string from input
-    var answer = input.map((e) => e!.value).join('');
-
-    var onPlace = 0;
-    var misplaced = 0;
-
+    // evaluate onPlace / misplaced
+    final guess = input.map((e) => e!.value).join();
+    int onPlace = 0, misplaced = 0;
     for (var i = 0; i < secretCodeLength; i++) {
-      final char = answer[i];
-      var isOnPlace = char == secretCode[i];
-
-      if (isOnPlace) {
+      if (guess[i] == secretCode[i]) {
         onPlace++;
-      } else if (secretCode.contains(char)) {
+      } else if (secretCode.contains(guess[i])) {
         misplaced++;
       }
     }
 
-    // win?
+    // update answers, gameState, and reset input
+    setState(() {
+      // new guess
+      answers = [
+        AnswerType(
+          input: input.map((e) => e!).toList(),
+          onPlace: onPlace,
+          misplaced: misplaced,
+        ),
+        ...answers,
+      ];
+    });
+
+    // win
     if (onPlace == secretCodeLength) {
-      gameState = GameState.win;
+      _roundTimer?.cancel();
+
+      try {
+        await _currentGameRef.update({'remainingTime': _timeRemainingSec});
+      } catch (e) {
+        print('Error updating remainingTime: $e');
+      }
+
+      setState(() {
+        gameState = GameState.win;
+      });
+      return;
     }
 
-    // loss?
-    if (answers.length >= (maxRounds - 1)) {
-      gameState = GameState.lose;
+    // lose
+    if (answers.length >= maxRounds - 1) {
+      _roundTimer?.cancel();
+      setState(() {
+        gameState = GameState.lose;
+      });
+      return;
     }
 
-    // add the answer to the answers list, new answer will be added to the top
-    answers = [
-      AnswerType(
-        input: input.map((e) => e!).toList(),
-        onPlace: onPlace,
-        misplaced: misplaced,
-      ),
-      ...answers,
-    ];
-
-    // reset the input
+    // clear the input for the next guess
     input = List.filled(secretCodeLength, null);
   }
 
@@ -228,12 +251,56 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
-  handleReset() {
+  Future<void> _startNewGame() async {
+    // generate a new secretCode
+    final newCode = generateRandomString(secretCodeLength, false);
+
+    try {
+      // tie this document to the current user
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final uid = currentUser?.uid;
+
+      _currentGameRef = await gamesRef.add({
+        'createdAt': FieldValue.serverTimestamp(),
+        if (uid != null) 'uid': uid,
+        'secretCode': newCode,
+        'codeLength': secretCodeLength,
+        // add remainingTime later when the user wins
+      });
+    } catch (e) {
+      print('Error writing secretCode to Firestore: $e');
+    }
+
+    _startTimer();
+
+    // update local state so the UI resets
     setState(() {
       answers = [];
       gameState = GameState.playing;
       input = List.filled(secretCodeLength, null);
-      secretCode = generateRandomString(secretCodeLength, false);
+      secretCode = newCode;
+    });
+  }
+
+  void _startTimer() {
+    // cancel any previous timer
+    _roundTimer?.cancel();
+
+    _timeRemainingSec = _initialTimeSec;
+
+    // new timer
+    _roundTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_timeRemainingSec > 0) {
+        setState(() {
+          _timeRemainingSec--;
+        });
+      } else {
+        // time up
+        timer.cancel();
+        setState(() {
+          gameState = GameState.lose;
+        });
+      }
     });
   }
 }
