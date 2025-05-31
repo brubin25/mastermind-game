@@ -27,7 +27,7 @@ android {
         applicationId = "com.example.mastermind_game"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -40,6 +40,11 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+dependencies {
+    implementation("com.firebaseui:firebase-ui-auth:9.0.0")
+    implementation(platform("com.google.firebase:firebase-bom:33.14.0"))
 }
 
 flutter {

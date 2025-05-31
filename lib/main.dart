@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
-import './ui/screen/game.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-void main() {
+import 'firebase_options.dart';
+import 'ui/screen/login_screen.dart';
+import 'ui/screen/game.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
 
@@ -13,7 +20,29 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Mastermind Game',
       theme: ThemeData(primarySwatch: Colors.grey, brightness: Brightness.dark),
-      home: const MainScaffold(),
+      // check auth state
+      home: const AuthenticationWrapper(),
+    );
+  }
+}
+
+// login/signup screen
+class AuthenticationWrapper extends StatelessWidget {
+  const AuthenticationWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // check if user is signed in
+        if (snapshot.hasData && snapshot.data != null) {
+          // pass the user to game screen
+          return const MainScaffold();
+        }
+        // otherwise, show login/signup screen
+        return const LoginScreen();
+      },
     );
   }
 }
@@ -46,6 +75,13 @@ class MainScaffold extends StatelessWidget {
               title: const Text('Settings'),
               onTap: () {
                 Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Logout'),
+              onTap: () async {
+                Navigator.of(context).pop();
+                await FirebaseAuth.instance.signOut();
               },
             ),
           ],
