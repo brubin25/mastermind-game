@@ -49,11 +49,19 @@ class ElementButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // text color based on background brightness
+    final bgColor = colors[int.parse(keyInputType.value) - 1];
+    final textColor =
+        ThemeData.estimateBrightnessForColor(bgColor) == Brightness.dark
+            ? Colors.white
+            : Colors.black;
+
     return Container(
-      width: 100,
-      height: 100,
+      width: 100.0,
+      height: 100.0,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
+        color: bgColor,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.5),
@@ -62,7 +70,15 @@ class ElementButton extends StatelessWidget {
             offset: const Offset(0, 3),
           ),
         ],
-        color: colors[int.parse(keyInputType.value) - 1],
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        keyInputType.value,
+        style: TextStyle(
+          color: textColor,
+          fontSize: 100 * 0.3,
+          // fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

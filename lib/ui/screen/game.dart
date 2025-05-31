@@ -43,7 +43,7 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
 
-    buttons = createKeyInputTypeList(6);
+    buttons = createKeyInputTypeList(9);
     secretCodeLength = 4;
     _startNewGame();
   }
@@ -97,12 +97,16 @@ class _GameScreenState extends State<GameScreen> {
           // timer ui
           Container(
             padding: const EdgeInsets.symmetric(vertical: 8.0),
-            color: Colors.black54,
+            color: Colors.transparent,
             width: double.infinity,
             child: Center(
               child: Text(
                 'Time Remaining: $_timeRemainingSec s',
-                style: const TextStyle(color: Colors.white, fontSize: 18),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),

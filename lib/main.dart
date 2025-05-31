@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'ui/screen/login_screen.dart';
 import 'ui/screen/game.dart';
+import 'ui/screen/record_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,18 +67,31 @@ class MainScaffold extends StatelessWidget {
               ),
             ),
             ListTile(
+              leading: const Icon(Icons.home),
               title: const Text('Home'),
               onTap: () {
                 Navigator.pop(context);
               },
             ),
             ListTile(
+              leading: const Icon(Icons.history),
+              title: const Text('My History'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const RecordScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
               title: const Text('Settings'),
               onTap: () {
                 Navigator.pop(context);
               },
             ),
             ListTile(
+              leading: const Icon(Icons.logout),
               title: const Text('Logout'),
               onTap: () async {
                 Navigator.of(context).pop();
