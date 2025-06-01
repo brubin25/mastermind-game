@@ -54,47 +54,53 @@ class _RecordScreenState extends State<RecordScreen> {
           final docs = snapshot.data!.docs;
 
           // filter only the documents where the user won
-          final wonDocs =
-              docs
-                  .where(
-                    (doc) =>
-                        doc.data() is Map<String, dynamic> &&
-                        (doc.data() as Map<String, dynamic>).containsKey(
-                          'remainingTime',
-                        ),
-                  )
-                  .toList();
+          // final wonDocs =
+          //     docs
+          //         .where(
+          //           (doc) =>
+          //               doc.data() is Map<String, dynamic> &&
+          //               (doc.data() as Map<String, dynamic>).containsKey(
+          //                 'remainingTime',
+          //               ),
+          //         )
+          //         .toList();
 
-          if (wonDocs.isEmpty) {
-            return const Center(
-              child: Text(
-                'No completed games found.',
-                style: TextStyle(fontSize: 16),
-              ),
-            );
-          }
+          // if (wonDocs.isEmpty) {
+          //   return const Center(
+          //     child: Text(
+          //       'No completed games found.',
+          //       style: TextStyle(fontSize: 16),
+          //     ),
+          //   );
+          // }
 
           return ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 8.0),
-            itemCount: wonDocs.length,
+            itemCount: docs.length,
             separatorBuilder: (context, index) => const Divider(height: 1),
             itemBuilder: (context, index) {
-              final doc = wonDocs[index];
+              final doc = docs[index];
               final data = doc.data() as Map<String, dynamic>;
 
               final Timestamp ts = data['createdAt'] as Timestamp;
               final DateTime date = ts.toDate();
 
-              final int remaining = (data['remainingTime'] as int);
+              final int remaining = (data['remainingTime'] as int?) ?? 0;
               final int spentSec = _initialTimeSec - remaining;
               final String formattedTime = _formatSeconds(spentSec);
+              final bool isWon = data.containsKey('remainingTime');
+
+              final String title =
+                  (data['steps'] as List<dynamic>?) != null
+                      ? '${data['steps'].length} steps ${isWon ? 'won' : 'lost'}'
+                      : 'Lost';
 
               return ListTile(
-                leading: const Icon(Icons.timer, color: Colors.white),
-                title: Text(
-                  formattedTime,
-                  style: const TextStyle(fontSize: 18),
+                leading: Icon(
+                  isWon ? Icons.thumb_up : Icons.thumb_down,
+                  color: isWon ? Colors.green : Colors.red,
                 ),
+                title: Text(title, style: const TextStyle(fontSize: 18)),
                 subtitle: Text(
                   'Played on ${_formatDateTime(date)}',
                   style: const TextStyle(fontSize: 14, color: Colors.white70),
