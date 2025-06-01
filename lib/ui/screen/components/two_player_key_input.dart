@@ -17,7 +17,7 @@ class KeyInput extends StatelessWidget {
       shrinkWrap: true,
       itemCount: children.length,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 1,
+        crossAxisCount: 9,
         mainAxisSpacing: 10.0,
       ),
 
@@ -32,10 +32,6 @@ class KeyInput extends StatelessWidget {
             onPressed(context, children[index]);
           },
           child: ElementButton(keyInputType: children[index]),
-          // child: Text(
-          //   children[index].value,
-          //   style: TextStyle(color: Colors.white),
-          // ),
         );
       },
     );
@@ -49,7 +45,6 @@ class ElementButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // text color based on background brightness
     final bgColor = colors[int.parse(keyInputType.value) - 1];
     final textColor =
         ThemeData.estimateBrightnessForColor(bgColor) == Brightness.dark
@@ -74,11 +69,7 @@ class ElementButton extends StatelessWidget {
       alignment: Alignment.center,
       child: Text(
         keyInputType.value,
-        style: TextStyle(
-          color: textColor,
-          fontSize: 100 * 0.3,
-          // fontWeight: FontWeight.bold,
-        ),
+        style: TextStyle(color: textColor, fontSize: 100 * 0.3),
       ),
     );
   }

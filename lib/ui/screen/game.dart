@@ -1,16 +1,18 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:mastermind_game/models/game.dart';
+import 'package:mastermind_game/models/game_mode.dart';
 import 'package:mastermind_game/ui/screen/components/key_input.dart';
-import 'dart:math';
 
 const int maxRounds = 10;
 typedef OnDeleteFunc = void Function(BuildContext context, int index);
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key});
+  final GameMode mode;
+
+  const GameScreen({super.key, required this.mode});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -43,6 +45,11 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
 
+    assert(
+      widget.mode == GameMode.single,
+      'GameScreen only supports GameMode.single',
+    );
+
     buttons = createKeyInputTypeList(9);
     secretCodeLength = 4;
     _startNewGame();
@@ -57,10 +64,11 @@ class _GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('Mastermind Game')),
       body: Container(
         decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/background.png'),
+            image: AssetImage('assets/images/background2.png'),
             fit: BoxFit.cover,
           ),
         ),
@@ -164,7 +172,7 @@ class _GameScreenState extends State<GameScreen> {
     if (!repeatNumber) {
       list.shuffle();
       var sc = list.sublist(0, secretCodeLength).join();
-      print('Secret code: $sc');
+      print('************ Secret code: $sc ************');
       return sc;
     }
 
@@ -175,7 +183,7 @@ class _GameScreenState extends State<GameScreen> {
       sb.write(list[random.nextInt(list.length)]);
     }
 
-    print('Secret code: ${sb.toString()}');
+    print('************ Secret code: ${sb.toString()} ************');
     return sb.toString();
   }
 
@@ -224,8 +232,7 @@ class _GameScreenState extends State<GameScreen> {
             'input': guess,
             'onPlace': onPlace,
             'misplaced': misplaced,
-            'createdAt':
-                DateTime.now().millisecondsSinceEpoch, // local timestamp
+            'createdAt': DateTime.now().millisecondsSinceEpoch,
           },
         ]),
       });
@@ -462,7 +469,7 @@ class WinComponent extends StatelessWidget {
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            padding: EdgeInsets.symmetric(horizontal: 30.0, vertical: 10.0),
+            padding: EdgeInsets.symmetric(horizontal: 30.0, vertical: 15.0),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(32.0),
             ),
@@ -470,7 +477,10 @@ class WinComponent extends StatelessWidget {
           onPressed: () {
             onReset();
           },
-          child: const Text('Play Again'),
+          child: const Text(
+            'Play Again',
+            style: TextStyle(color: Colors.white),
+          ),
         ),
       ],
     );
@@ -501,13 +511,13 @@ class LoseComponent extends StatelessWidget {
         ),
         Center(
           child: Text(
-            ' You\'ve used all $maxRounds rounds\nThe secret code was $secretCode',
+            'The secret code was $secretCode',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
           ),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            padding: EdgeInsets.symmetric(horizontal: 30.0, vertical: 10.0),
+            padding: EdgeInsets.symmetric(horizontal: 30.0, vertical: 15.0),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(32.0),
             ),
@@ -515,7 +525,10 @@ class LoseComponent extends StatelessWidget {
           onPressed: () {
             onReset();
           },
-          child: const Text('Play Again'),
+          child: const Text(
+            'Play Again',
+            style: TextStyle(color: Colors.white),
+          ),
         ),
       ],
     );

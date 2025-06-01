@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+enum GameMode { single, twoPlayer }
+
 enum GameState { playing, win, lose }
 
 List<Color> colors = [

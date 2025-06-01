@@ -4,9 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'firebase_options.dart';
 import 'ui/screen/login_screen.dart';
-import 'ui/screen/game.dart';
 import 'ui/screen/record_screen.dart';
 import 'ui/screen/leaderboard_screen.dart';
+import 'ui/screen/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -118,7 +118,7 @@ class MainScaffold extends StatelessWidget {
           ],
         ),
       ),
-      body: GameScreen(),
+      body: ModeSelectionScreen(),
     );
   }
 }
