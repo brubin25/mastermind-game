@@ -101,7 +101,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               final formatted = _formatSeconds(entry.timeSpent);
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: Colors.deepPurple,
+                  backgroundColor: const Color(0xFF0D47A1),
                   child: Text(
                     '$rank',
                     style: const TextStyle(color: Colors.white),
