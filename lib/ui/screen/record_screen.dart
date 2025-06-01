@@ -10,7 +10,7 @@ class RecordScreen extends StatefulWidget {
 }
 
 class _RecordScreenState extends State<RecordScreen> {
-  final int _initialTimeSec = 60;
+  static const int _initialTimeSec = 300;
   late final String _uid;
 
   @override
@@ -23,7 +23,6 @@ class _RecordScreenState extends State<RecordScreen> {
   @override
   Widget build(BuildContext context) {
     if (_uid.isEmpty) {
-      // screen only be reachable if the user is signed in
       return const Scaffold(
         body: Center(
           child: Text('You must be signed in to view your records.'),
@@ -31,8 +30,7 @@ class _RecordScreenState extends State<RecordScreen> {
       );
     }
 
-    // all games for this user, most recent first
-    final query = FirebaseFirestore.instance
+    final gamesQuery = FirebaseFirestore.instance
         .collection('games')
         .where('uid', isEqualTo: _uid)
         .orderBy('createdAt', descending: true);
@@ -40,7 +38,7 @@ class _RecordScreenState extends State<RecordScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('My History')),
       body: StreamBuilder<QuerySnapshot>(
-        stream: query.snapshots(),
+        stream: gamesQuery.snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
@@ -53,26 +51,15 @@ class _RecordScreenState extends State<RecordScreen> {
 
           final docs = snapshot.data!.docs;
 
-          // filter only the documents where the user won
-          // final wonDocs =
-          //     docs
-          //         .where(
-          //           (doc) =>
-          //               doc.data() is Map<String, dynamic> &&
-          //               (doc.data() as Map<String, dynamic>).containsKey(
-          //                 'remainingTime',
-          //               ),
-          //         )
-          //         .toList();
-
-          // if (wonDocs.isEmpty) {
-          //   return const Center(
-          //     child: Text(
-          //       'No completed games found.',
-          //       style: TextStyle(fontSize: 16),
-          //     ),
-          //   );
-          // }
+          if (docs.isEmpty) {
+            return const Center(
+              child: Text(
+                'No games found.\nPlay a round to see it here!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16),
+              ),
+            );
+          }
 
           return ListView.separated(
             padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -85,21 +72,24 @@ class _RecordScreenState extends State<RecordScreen> {
               final Timestamp ts = data['createdAt'] as Timestamp;
               final DateTime date = ts.toDate();
 
+              final steps = (data['steps'] as List<dynamic>?) ?? [];
+              final bool isWon = data.containsKey('remainingTime');
               final int remaining = (data['remainingTime'] as int?) ?? 0;
               final int spentSec = _initialTimeSec - remaining;
               final String formattedTime = _formatSeconds(spentSec);
-              final bool isWon = data.containsKey('remainingTime');
 
+              final String outcome = isWon ? 'WON' : 'LOST';
               final String title =
-                  (data['steps'] as List<dynamic>?) != null
-                      ? '${data['steps'].length} steps ${isWon ? 'won' : 'lost'}'
-                      : 'Lost';
+                  '$outcome in ${steps.length} steps, spent $formattedTime.';
+
+              final IconData icon =
+                  isWon
+                      ? Icons.sentiment_very_satisfied
+                      : Icons.sentiment_very_dissatisfied_outlined;
+              final Color iconColor = isWon ? Colors.green : Colors.red;
 
               return ListTile(
-                leading: Icon(
-                  isWon ? Icons.thumb_up : Icons.thumb_down,
-                  color: isWon ? Colors.green : Colors.red,
-                ),
+                leading: Icon(icon, color: iconColor, size: 45),
                 title: Text(title, style: const TextStyle(fontSize: 18)),
                 subtitle: Text(
                   'Played on ${_formatDateTime(date)}',
@@ -117,19 +107,19 @@ class _RecordScreenState extends State<RecordScreen> {
     );
   }
 
-  // seconds into MM:SS
   String _formatSeconds(int total) {
     final minutes = (total ~/ 60).toString().padLeft(2, '0');
     final seconds = (total % 60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
   }
 
-  // date/time
   String _formatDateTime(DateTime dt) {
-    final datePart = '${_monthName(dt.month)} ${dt.day}, ${dt.year}';
+    final month = _monthName(dt.month);
+    final day = dt.day;
+    final year = dt.year;
     final hour = dt.hour.toString().padLeft(2, '0');
     final minute = dt.minute.toString().padLeft(2, '0');
-    return '$datePart at $hour:$minute';
+    return '$month $day, $year at $hour:$minute';
   }
 
   String _monthName(int monthIndex) {
