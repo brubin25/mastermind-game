@@ -109,9 +109,11 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
       if (w == 'P1') {
         winner = Player.player1;
         _roundTimer?.cancel();
+        print("w == 'P1'");
       } else if (w == 'P2') {
         winner = Player.player2;
         _roundTimer?.cancel();
+        print("w == 'P2'");
       } else {
         winner = null;
       }
@@ -299,10 +301,10 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
                     const SizedBox(height: 8),
                     Text(
                       winner != null
-                          ? 'Player ${winner == Player.player1 ? "1" : "2"} Wins!'
-                          : gameOver
-                          ? 'Game Over! No one guessed!'
-                          : 'Turn: Player ${currentPlayer == Player.player1 ? "1" : "2"}',
+                          ? ('Player ${winner == Player.player1 ? "1" : "2"} Wins!')
+                          : (gameOver
+                              ? 'Game Over! No one guessed!'
+                              : 'Turn: Player ${currentPlayer == Player.player1 ? "1" : "2"}'),
                       style: const TextStyle(
                         color: Colors.pinkAccent,
                         fontSize: 18,
@@ -334,7 +336,13 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
                             children: [
                               if (winner != null)
                                 Text(
-                                  ' ${winner == Player.player1 ? "Congratulations!" : "May be next time..."} ',
+                                  myUid == player1Uid
+                                      ? (winner == Player.player1
+                                          ? "Congratulations!"
+                                          : "Maybe next time...")
+                                      : (winner == Player.player1
+                                          ? "Maybe next time..."
+                                          : "Congratulations!"),
                                   style: const TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
