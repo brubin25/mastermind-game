@@ -263,6 +263,9 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
       );
     }
 
+    final isMePlayer1 = myUid == player1Uid;
+    final myLabel = isMePlayer1 ? 'You are Player 1' : 'You are Player 2';
+
     final isMyTurn =
         winner == null &&
         !gameOver &&
@@ -270,7 +273,7 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
             (currentPlayer == Player.player2 && player2Uid == myUid));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Mastermind: Two-Player mode')),
+      appBar: AppBar(title: Text(myLabel)),
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(

@@ -172,7 +172,7 @@ class _GameScreenState extends State<GameScreen> {
     if (!repeatNumber) {
       list.shuffle();
       var sc = list.sublist(0, secretCodeLength).join();
-      print('************ Secret code: $sc ************');
+      print('=============== Secret code: $sc ===============');
       return sc;
     }
 
@@ -183,7 +183,7 @@ class _GameScreenState extends State<GameScreen> {
       sb.write(list[random.nextInt(list.length)]);
     }
 
-    print('************ Secret code: ${sb.toString()} ************');
+    print('=============== Secret code: ${sb.toString()} ===============');
     return sb.toString();
   }
 
@@ -245,7 +245,10 @@ class _GameScreenState extends State<GameScreen> {
       _roundTimer?.cancel();
 
       try {
-        await _currentGameRef.update({'remainingTime': _timeRemainingSec});
+        await _currentGameRef.update({
+          'remainingTime': _timeRemainingSec,
+          'winOrLose': 'win',
+        });
       } catch (e) {
         print('Error updating remainingTime: $e');
       }
@@ -257,8 +260,18 @@ class _GameScreenState extends State<GameScreen> {
     }
 
     // lose
-    if (answers.length >= maxRounds - 1) {
+    if (answers.length >= maxRounds) {
       _roundTimer?.cancel();
+
+      try {
+        await _currentGameRef.update({
+          'remainingTime': _timeRemainingSec,
+          'winOrLose': 'lose',
+        });
+      } catch (e) {
+        print('Error updating remainingTime: $e');
+      }
+
       setState(() {
         gameState = GameState.lose;
       });
@@ -327,6 +340,11 @@ class _GameScreenState extends State<GameScreen> {
       } else {
         // time up
         timer.cancel();
+        // update Firestore to mark as a loss when timer expires
+        _currentGameRef.update({'winOrLose': 'lose'}).catchError((e) {
+          print('Error writing winOrLose on timeout: $e');
+        });
+
         setState(() {
           gameState = GameState.lose;
         });

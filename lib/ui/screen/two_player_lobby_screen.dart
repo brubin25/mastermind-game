@@ -44,7 +44,7 @@ class _TwoPlayerLobbyScreenState extends State<TwoPlayerLobbyScreen> {
 
     final uid = user.uid;
     final secretCode = _generateRandomString(4, repeatsAllowed: false);
-    print('************ secret code: $secretCode ************');
+    print('=============== secret code: $secretCode ===============');
 
     try {
       final docRef = await _gamesRef.add({

@@ -73,7 +73,8 @@ class _RecordScreenState extends State<RecordScreen> {
               final DateTime date = ts.toDate();
 
               final steps = (data['steps'] as List<dynamic>?) ?? [];
-              final bool isWon = data.containsKey('remainingTime');
+              final String winOrLose = (data['winOrLose'] as String?) ?? 'lose';
+              final bool isWon = winOrLose == 'win';
               final int remaining = (data['remainingTime'] as int?) ?? 0;
               final int spentSec = _initialTimeSec - remaining;
               final String formattedTime = _formatSeconds(spentSec);
