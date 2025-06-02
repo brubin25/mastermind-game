@@ -190,6 +190,28 @@ class _GameScreenState extends State<GameScreen> {
   Future<void> handleOnPressed(BuildContext context, KeyInputType value) async {
     if (gameState != GameState.playing) return;
 
+    // prevent input duplication
+    final alreadyPicked = input
+        .where((e) => e != null)
+        .any((e) => e!.value == value.value);
+    if (alreadyPicked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.black87,
+          content: Text(
+            'Each colour should be unique.',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          duration: Duration(milliseconds: 800),
+        ),
+      );
+      return;
+    }
+
     // fill empty slot
     final index = input.indexWhere((e) => e == null);
     setState(() {

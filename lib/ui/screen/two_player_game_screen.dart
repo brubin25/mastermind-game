@@ -213,7 +213,7 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
       }
     } else {
       _roundTimer?.cancel();
-      setState(() => winner = currentPlayer);
+      setState;
     }
   }
 
@@ -339,9 +339,9 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
                                   myUid == player1Uid
                                       ? (winner == Player.player1
                                           ? "Congratulations!"
-                                          : "Maybe next time...")
+                                          : "Oops, maybe next time...")
                                       : (winner == Player.player1
-                                          ? "Maybe next time..."
+                                          ? "Oops, maybe next time..."
                                           : "Congratulations!"),
                                   style: const TextStyle(
                                     fontSize: 24,
