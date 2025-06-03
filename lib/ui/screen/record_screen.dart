@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:lottie/lottie.dart';
 
 class RecordScreen extends StatefulWidget {
   const RecordScreen({super.key});
@@ -90,8 +91,19 @@ class _RecordScreenState extends State<RecordScreen> {
               final Color iconColor = isWon ? Colors.green : Colors.red;
 
               return ListTile(
-                leading: Icon(icon, color: iconColor, size: 45),
+                leading: Lottie.asset(
+                  'assets/images/victory.json',
+                  width: 45,
+                  height: 45,
+                  fit: BoxFit.cover,
+                ),
                 title: Text(title, style: const TextStyle(fontSize: 18)),
+                trailing: Lottie.asset(
+                  'assets/images/confetti.json',
+                  width: 45,
+                  height: 45,
+                  fit: BoxFit.cover,
+                ),
                 subtitle: Text(
                   'Played on ${_formatDateTime(date)}',
                   style: const TextStyle(fontSize: 14, color: Colors.white70),
