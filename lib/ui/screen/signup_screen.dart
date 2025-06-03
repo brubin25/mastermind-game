@@ -74,56 +74,77 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Sign Up')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // email
-            TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Email'),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/background4.png',
+              fit: BoxFit.cover,
             ),
-
-            const SizedBox(height: 12),
-
-            // password
-            TextField(
-              controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Password'),
-            ),
-
-            const SizedBox(height: 12),
-
-            // confirm password
-            TextField(
-              controller: _confirmController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Confirm Password'),
-            ),
-
-            const SizedBox(height: 16),
-
-            if (_errorMessage != null)
-              Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
-
-            const SizedBox(height: 12),
-
-            ElevatedButton(
-              onPressed: _isLoading ? null : _signup,
-              child:
-                  _isLoading
+          ),
+          Container(color: Colors.black.withOpacity(0.6)),
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                const SizedBox(height: 60),
+                TextField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    labelStyle: TextStyle(color: Colors.white),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white38),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Password',
+                    labelStyle: TextStyle(color: Colors.white),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white38),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _confirmController,
+                  obscureText: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm Password',
+                    labelStyle: TextStyle(color: Colors.white),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white38),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (_errorMessage != null)
+                  Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _signup,
+                  child: _isLoading
                       ? const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      )
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  )
                       : const Text(
-                        'Sign Up',
-                        style: TextStyle(color: Colors.white, fontSize: 16),
-                      ),
+                    'Sign Up',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
