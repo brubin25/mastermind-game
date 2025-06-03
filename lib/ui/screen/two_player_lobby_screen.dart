@@ -199,7 +199,7 @@ class _TwoPlayerLobbyScreenState extends State<TwoPlayerLobbyScreen> {
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/background3.png'),
+            image: AssetImage('assets/images/background6.png'),
             fit: BoxFit.cover,
           ),
         ),
