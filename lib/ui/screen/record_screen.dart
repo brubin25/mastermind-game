@@ -102,7 +102,7 @@ class _RecordScreenState extends State<RecordScreen> {
                                   steps
                                       .map((step) => AnswerType.fromJson(step))
                                       .toList(),
-                              maxDigits: 5,
+                              maxDigits: 4,
                             ),
                           ),
                           actions: [
