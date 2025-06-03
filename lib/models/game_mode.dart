@@ -32,6 +32,15 @@ class AnswerType {
     required this.onPlace,
     required this.misplaced,
   });
+
+  factory AnswerType.fromJson(Map<String, dynamic> json) {
+    var inputList = json['input'] as String? ?? '';
+    return AnswerType(
+      input: inputList.split('').map((e) => KeyInputType(value: e)).toList(),
+      onPlace: json['onPlace'] as int,
+      misplaced: json['misplaced'] as int,
+    );
+  }
 }
 
 List<KeyInputType> createKeyInputTypeList(int size) {

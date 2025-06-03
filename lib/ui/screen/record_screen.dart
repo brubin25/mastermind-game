@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
+import 'package:mastermind_game/models/game_mode.dart';
+import 'package:mastermind_game/ui/screen/game.dart';
 
 class RecordScreen extends StatefulWidget {
   const RecordScreen({super.key});
@@ -83,14 +85,35 @@ class _RecordScreenState extends State<RecordScreen> {
               final String outcome = isWon ? 'WON' : 'LOST';
               final String title =
                   '$outcome in ${steps.length} steps, spent $formattedTime.';
-
-              final IconData icon =
-                  isWon
-                      ? Icons.sentiment_very_satisfied
-                      : Icons.sentiment_very_dissatisfied_outlined;
-              final Color iconColor = isWon ? Colors.green : Colors.red;
+              print(steps.map((step) => AnswerType.fromJson(step)).toList());
 
               return ListTile(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder:
+                        (context) => AlertDialog(
+                          title: const Text('Game Details'),
+                          content: SizedBox(
+                            width: MediaQuery.of(context).size.width * 0.8,
+                            height: MediaQuery.of(context).size.height * 0.6,
+                            child: Answers(
+                              answers:
+                                  steps
+                                      .map((step) => AnswerType.fromJson(step))
+                                      .toList(),
+                              maxDigits: 5,
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        ),
+                  );
+                },
                 leading: Lottie.asset(
                   'assets/images/victory.json',
                   width: 45,
