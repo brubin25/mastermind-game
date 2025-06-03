@@ -7,6 +7,7 @@ import 'ui/screen/login_screen.dart';
 import 'ui/screen/record_screen.dart';
 import 'ui/screen/leaderboard_screen.dart';
 import 'ui/screen/home_screen.dart';
+import 'ui/screen/game_mechanics_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,13 +23,11 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Mastermind Game',
       theme: ThemeData(primarySwatch: Colors.grey, brightness: Brightness.dark),
-      // check auth state
       home: const AuthenticationWrapper(),
     );
   }
 }
 
-// login/signup screen
 class AuthenticationWrapper extends StatelessWidget {
   const AuthenticationWrapper({super.key});
 
@@ -37,12 +36,9 @@ class AuthenticationWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // check if user is signed in
         if (snapshot.hasData && snapshot.data != null) {
-          // pass the user to game screen
           return const MainScaffold();
         }
-        // otherwise, show login/signup screen
         return const LoginScreen();
       },
     );
@@ -79,6 +75,18 @@ class MainScaffold extends StatelessWidget {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.rule),
+              title: const Text('Game Mechanics'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const GameMechanicsScreen(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.history),
               title: const Text('My History'),
               onTap: () {
@@ -100,13 +108,6 @@ class MainScaffold extends StatelessWidget {
                 );
               },
             ),
-            // ListTile(
-            //   leading: const Icon(Icons.settings),
-            //   title: const Text('Settings'),
-            //   onTap: () {
-            //     Navigator.pop(context);
-            //   },
-            // ),
             ListTile(
               leading: const Icon(Icons.logout),
               title: const Text('Logout'),
