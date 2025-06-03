@@ -159,6 +159,44 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
     final isP2Turn = currentPlayer == Player.player2 && player2Uid == myUid;
     if (!isP1Turn && !isP2Turn) return;
 
+    // Check players if used all 5 turns
+    final p1Turns = answersP1.length;
+    final p2Turns = answersP2.length;
+    if (isP1Turn && p1Turns >= maxTurnsPerPlayer) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.black87,
+          content: Text(
+            'You’ve used all 5 turns already.',
+            style: TextStyle(
+              color: Colors.redAccent[700],
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          duration: Duration(milliseconds: 800),
+        ),
+      );
+      return;
+    }
+    if (isP2Turn && p2Turns >= maxTurnsPerPlayer) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.black87,
+          content: Text(
+            'You’ve used all 5 turns already.',
+            style: TextStyle(
+              color: Colors.redAccent[700],
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          duration: Duration(milliseconds: 800),
+        ),
+      );
+      return;
+    }
+
     final activeInput = isP1Turn ? inputP1 : inputP2;
 
     // prevent input duplication
@@ -167,17 +205,17 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
         .any((e) => e!.value == value.value);
     if (alreadyPicked) {
       ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.black,
+        const SnackBar(
+          backgroundColor: Colors.black87,
           content: Text(
             'Each colour should be unique.',
             style: TextStyle(
               color: Colors.white,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
-              fontSize: 24,
             ),
           ),
-          duration: const Duration(milliseconds: 800),
+          duration: Duration(milliseconds: 800),
         ),
       );
       return;
@@ -207,10 +245,10 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
     };
 
     final isP1 = currentPlayer == Player.player1;
+    final isP2 = currentPlayer == Player.player2;
     final nextPlayer = isP1 ? 'P2' : 'P1';
     final isWin = onPlace == secretCodeLength;
 
-    final totalBefore = answersP1.length + answersP2.length;
     final updates = <String, Object>{
       if (isP1) 'stepsP1': FieldValue.arrayUnion([newAnswer]),
       if (!isP1) 'stepsP2': FieldValue.arrayUnion([newAnswer]),
@@ -230,8 +268,11 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
         }
       });
 
-      final totalAfter = totalBefore + 1;
-      if (totalAfter >= maxTurnsPerPlayer * 2) {
+      final newP1Turns = isP1 ? (p1Turns + 1) : p1Turns;
+      final newP2Turns = isP2 ? (p2Turns + 1) : p2Turns;
+
+      // If both players have used 5 turns, end the game
+      if (newP1Turns >= maxTurnsPerPlayer && newP2Turns >= maxTurnsPerPlayer) {
         setState(() => gameOver = true);
       }
     } else {
@@ -297,6 +338,10 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
         ((currentPlayer == Player.player1 && player1Uid == myUid) ||
             (currentPlayer == Player.player2 && player2Uid == myUid));
 
+    final bothFinished =
+        answersP1.length >= maxTurnsPerPlayer &&
+        answersP2.length >= maxTurnsPerPlayer;
+
     return Scaffold(
       appBar: AppBar(title: Text(myLabel)),
       body: Container(
@@ -325,7 +370,7 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
                     Text(
                       winner != null
                           ? ('Player ${winner == Player.player1 ? "1" : "2"} Wins!')
-                          : (gameOver
+                          : (bothFinished
                               ? 'Game Over! No one guessed!'
                               : 'Turn: Player ${currentPlayer == Player.player1 ? "1" : "2"}'),
                       style: const TextStyle(
@@ -348,82 +393,93 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
                 child: _buildHistoryColumn('Player 2', answersP2),
               ),
 
-              Expanded(
-                flex: 2,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child:
-                      (winner != null || gameOver)
-                          ? Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (winner != null)
-                                Text(
-                                  myUid == player1Uid
-                                      ? (winner == Player.player1
-                                          ? "Congratulations!"
-                                          : "Oops, maybe next time...")
-                                      : (winner == Player.player1
-                                          ? "Oops, maybe next time..."
-                                          : "Congratulations!"),
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.lightBlue,
-                                  ),
-                                )
-                              else
-                                Text(
-                                  'Reached $maxTurnsPerPlayer turns each\nSecret: $secretCode',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    color: Colors.redAccent,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              const SizedBox(height: 3),
-                              ElevatedButton(
-                                onPressed:
-                                    () => Navigator.of(
-                                      context,
-                                    ).popUntil((r) => r.isFirst),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.lightBlue,
-                                ),
-                                child: const Text(
-                                  'Exit to Menu',
-                                  style: TextStyle(color: Colors.white),
-                                ),
+              if (winner != null || bothFinished) ...[
+                Expanded(
+                  flex: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (winner != null)
+                            Text(
+                              myUid == player1Uid
+                                  ? (winner == Player.player1
+                                      ? "Congratulations!"
+                                      : "Oops, maybe next time…")
+                                  : (winner == Player.player1
+                                      ? "Oops, maybe next time…"
+                                      : "Congratulations!"),
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.lightBlue,
                               ),
-                            ],
-                          )
-                          : InputComponent(
-                            input:
-                                (currentPlayer == Player.player1)
-                                    ? inputP1
-                                    : inputP2,
-                            onDelete: handleOnDelete,
+                              textAlign: TextAlign.center,
+                            )
+                          else
+                            Text(
+                              'Reached $maxTurnsPerPlayer turns each\nSecret: $secretCode',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                color: Colors.redAccent,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed:
+                                () => Navigator.of(
+                                  context,
+                                ).popUntil((r) => r.isFirst),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.lightBlue,
+                            ),
+                            child: const Text(
+                              'Exit to Menu',
+                              style: TextStyle(color: Colors.white),
+                            ),
                           ),
-                ),
-              ),
-
-              Expanded(
-                flex: 2,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12.0,
-                    vertical: 8.0,
-                  ),
-                  child: AbsorbPointer(
-                    absorbing: !isMyTurn,
-                    child: KeyInput(
-                      onPressed: handleOnPressed,
-                      children: buttons,
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ] else ...[
+                // Not game-over: show InputComponent (flex 2) then KeyInput (flex 2):
+                Expanded(
+                  flex: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: InputComponent(
+                      input:
+                          (currentPlayer == Player.player1) ? inputP1 : inputP2,
+                      onDelete: handleOnDelete,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12.0,
+                      vertical: 8.0,
+                    ),
+                    child: AbsorbPointer(
+                      absorbing: !isMyTurn,
+                      child: KeyInput(
+                        onPressed: handleOnPressed,
+                        children: buttons,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

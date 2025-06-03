@@ -74,7 +74,7 @@ class _TwoPlayerLobbyScreenState extends State<TwoPlayerLobbyScreen> {
                 children: [
                   const Text(
                     'Share this Room ID with Player 2:',
-                    style: TextStyle(fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -84,7 +84,7 @@ class _TwoPlayerLobbyScreenState extends State<TwoPlayerLobbyScreen> {
                         child: SelectableText(
                           roomId,
                           style: const TextStyle(
-                            fontSize: 20,
+                            fontSize: 16,
                             color: Colors.blueAccent,
                             fontWeight: FontWeight.bold,
                           ),
@@ -111,7 +111,14 @@ class _TwoPlayerLobbyScreenState extends State<TwoPlayerLobbyScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('OK'),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -266,7 +273,7 @@ class _TwoPlayerLobbyScreenState extends State<TwoPlayerLobbyScreen> {
               TextField(
                 controller: _joinController,
                 style: const TextStyle(
-                  color: Colors.redAccent,
+                  color: Colors.blueAccent,
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
                 ),

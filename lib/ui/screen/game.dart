@@ -497,7 +497,7 @@ class WinComponent extends StatelessWidget {
       children: [
         const Center(
           child: Text(
-            'Congratulations! XD',
+            'Congrats! XD',
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
         ),
