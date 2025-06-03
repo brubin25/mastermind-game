@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'two_player_game_screen.dart';
@@ -76,13 +77,34 @@ class _TwoPlayerLobbyScreenState extends State<TwoPlayerLobbyScreen> {
                     style: TextStyle(fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 12),
-                  SelectableText(
-                    roomId,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      color: Colors.blueAccent,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: SelectableText(
+                          roomId,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            color: Colors.blueAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      // Copy button
+                      IconButton(
+                        icon: const Icon(Icons.copy, color: Colors.blueAccent),
+                        tooltip: 'Copy to clipboard',
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: roomId));
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(
+                              content: Text('Room ID copied to clipboard'),
+                              duration: Duration(milliseconds: 800),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -262,6 +284,17 @@ class _TwoPlayerLobbyScreenState extends State<TwoPlayerLobbyScreen> {
                   ),
                   enabledBorder: const OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.white),
+                  ),
+                  // add a Paste icon to the TextField so users can tap to paste from clipboard
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.paste, color: Colors.white),
+                    tooltip: 'Paste from clipboard',
+                    onPressed: () async {
+                      final data = await Clipboard.getData('text/plain');
+                      if (data?.text != null) {
+                        _joinController.text = data!.text!;
+                      }
+                    },
                   ),
                 ),
               ),

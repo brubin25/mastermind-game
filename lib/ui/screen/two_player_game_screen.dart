@@ -160,6 +160,29 @@ class _TwoPlayerGameScreenState extends State<TwoPlayerGameScreen> {
     if (!isP1Turn && !isP2Turn) return;
 
     final activeInput = isP1Turn ? inputP1 : inputP2;
+
+    // prevent input duplication
+    final alreadyPicked = activeInput
+        .where((e) => e != null)
+        .any((e) => e!.value == value.value);
+    if (alreadyPicked) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.black,
+          content: Text(
+            'Each colour should be unique.',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
+            ),
+          ),
+          duration: const Duration(milliseconds: 800),
+        ),
+      );
+      return;
+    }
+
     final idx = activeInput.indexWhere((e) => e == null);
     if (idx == -1) return;
 
