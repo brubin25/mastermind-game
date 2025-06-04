@@ -82,6 +82,8 @@ flutter:
     - assets/images/levels_new/4.png
     - assets/images/levels_new/5.png
     - assets/images/levels_new/6.png
+    - assets/images/wolf.jpg
+    - assets/images/levels/level2.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

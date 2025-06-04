@@ -63,7 +63,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Leaderboard')),
-      body: FutureBuilder<List<_UserBest>>(
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/wolf.jpg'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: FutureBuilder<List<_UserBest>>(
         future: _leaderboardFuture,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
@@ -113,6 +120,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             },
           );
         },
+      ),
       ),
     );
   }
