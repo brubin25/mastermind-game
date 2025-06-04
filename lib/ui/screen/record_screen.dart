@@ -85,7 +85,6 @@ class _RecordScreenState extends State<RecordScreen> {
               final String outcome = isWon ? 'WON' : 'LOST';
               final String title =
                   '$outcome in ${steps.length} steps, spent $formattedTime.';
-              print(steps.map((step) => AnswerType.fromJson(step)).toList());
 
               return ListTile(
                 onTap: () {
@@ -115,18 +114,23 @@ class _RecordScreenState extends State<RecordScreen> {
                   );
                 },
                 leading: Lottie.asset(
-                  'assets/images/victory.json',
+                  isWon
+                      ? 'assets/images/victory.json'
+                      : 'assets/images/lose.json',
                   width: 45,
                   height: 45,
-                  fit: BoxFit.cover,
+                  fit: BoxFit.fill,
                 ),
                 title: Text(title, style: const TextStyle(fontSize: 18)),
-                trailing: Lottie.asset(
-                  'assets/images/confetti.json',
-                  width: 45,
-                  height: 45,
-                  fit: BoxFit.cover,
-                ),
+                trailing:
+                    isWon
+                        ? Lottie.asset(
+                          'assets/images/confetti.json',
+                          width: 45,
+                          height: 45,
+                          fit: BoxFit.cover,
+                        )
+                        : null,
                 subtitle: Text(
                   'Played on ${_formatDateTime(date)}',
                   style: const TextStyle(fontSize: 14, color: Colors.white70),
