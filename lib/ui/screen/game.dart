@@ -5,14 +5,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mastermind_game/models/game_mode.dart';
 import 'package:mastermind_game/ui/screen/components/key_input.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const int maxRounds = 10;
+
 typedef OnDeleteFunc = void Function(BuildContext context, int index);
 
 class GameScreen extends StatefulWidget {
   final GameMode mode;
+  int _soloGameCount = 0;
+  GameScreen({super.key, required this.mode});
 
-  const GameScreen({super.key, required this.mode});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -41,6 +44,9 @@ class _GameScreenState extends State<GameScreen> {
   // show elapsed time instead of countdown
   // final Stopwatch _stopwatch = Stopwatch();
 
+  int _soloGameCount = 0;
+  int _backgroundIndex = 1;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +58,7 @@ class _GameScreenState extends State<GameScreen> {
 
     buttons = createKeyInputTypeList(9);
     secretCodeLength = 4;
+    _initPreferences();
     _startNewGame();
   }
 
@@ -68,7 +75,8 @@ class _GameScreenState extends State<GameScreen> {
       body: Container(
         decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/background2.png'),
+            // image: AssetImage('assets/images/background2.png'),
+            image: AssetImage('assets/images/levels_new/$_backgroundIndex.png'),
             fit: BoxFit.cover,
           ),
         ),
@@ -95,6 +103,15 @@ class _GameScreenState extends State<GameScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _initPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    int count = prefs.getInt('soloGameCount') ?? 0;
+
+    setState(() {
+      _soloGameCount = count;
+    });
   }
 
   _buildMainLayout(BuildContext context) {
@@ -332,6 +349,11 @@ class _GameScreenState extends State<GameScreen> {
         'steps': [],
         // add remaining time later when the user wins
       });
+
+      final prefs = await SharedPreferences.getInstance();
+      _soloGameCount++;
+      await prefs.setInt('solo_game_count', _soloGameCount);
+      _backgroundIndex = (_soloGameCount % 6) + 1;
     } catch (e) {
       print('Error writing secretCode to Firestore: $e');
     }
