@@ -1,132 +1,112 @@
+// lib/ui/screen/leaderboard_screen.dart
+
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
+
+class LeaderboardEntry {
+  final String username;
+  final int bestTime; // 秒为单位
+  LeaderboardEntry({required this.username, required this.bestTime});
+}
 
 class LeaderboardScreen extends StatefulWidget {
-  const LeaderboardScreen({super.key});
+  const LeaderboardScreen({Key? key}) : super(key: key);
 
   @override
   State<LeaderboardScreen> createState() => _LeaderboardScreenState();
 }
 
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
-  static const int _initialTimeSec = 300;
-  late Future<List<_UserBest>> _leaderboardFuture;
+  final _dbRef = FirebaseDatabase.instance.ref();
+  List<LeaderboardEntry> _entries = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _leaderboardFuture = _fetchLeaderboardData();
+    _fetchLeaderboard();
   }
 
-  // fetch all winning game documents
-  Future<List<_UserBest>> _fetchLeaderboardData() async {
-    final querySnapshot =
-        await FirebaseFirestore.instance
-            .collection('games')
-            .where('remainingTime', isGreaterThanOrEqualTo: 0)
-            .get();
-
-    final Map<String, int> bestTimeMap = {};
-
-    for (final doc in querySnapshot.docs) {
-      final Map<String, dynamic> data = doc.data();
-
-      // skip invalid documents
-      if (!data.containsKey('remainingTime') || data['remainingTime'] == null) {
-        continue;
-      }
-      if (!data.containsKey('email') || data['email'] == null) {
-        continue;
-      }
-
-      final email = data['email'] as String;
-      final remaining = data['remainingTime'] as int;
-
-      final timeSpent = _initialTimeSec - remaining;
-
-      if (!bestTimeMap.containsKey(email) || timeSpent < bestTimeMap[email]!) {
-        bestTimeMap[email] = timeSpent;
-      }
+  Future<void> _fetchLeaderboard() async {
+    // final snapshot = await _dbRef.child('leaderboard').once();
+    // final data = snapshot.value as Map<dynamic, dynamic>?;
+    DataSnapshot snapshot = await _dbRef.get();
+    final data = snapshot.value as Map<dynamic, dynamic>?; // 这里 snapshot.value 是动态类型，可能为 null
+    if (data != null) {
+      final List<LeaderboardEntry> temp = [];
+      data.forEach((key, value) {
+        final username = value['username'] as String? ?? 'N/A';
+        final bestTime = value['bestTime'] as int? ?? 0;
+        temp.add(LeaderboardEntry(username: username, bestTime: bestTime));
+      });
+      temp.sort((a, b) => a.bestTime.compareTo(b.bestTime));
+      setState(() {
+        _entries = temp;
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+      });
     }
-
-    final List<_UserBest> list =
-        bestTimeMap.entries
-            .map((e) => _UserBest(email: e.key, timeSpent: e.value))
-            .toList();
-
-    list.sort((a, b) => a.timeSpent.compareTo(b.timeSpent));
-
-    return list;
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Leaderboard')),
-      body: FutureBuilder<List<_UserBest>>(
-        future: _leaderboardFuture,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Error loading leaderboard:\n${snapshot.error}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red),
+      appBar: AppBar(
+        title: const Text('Leaderboard'),
+      ),
+      body: _isLoading
+          ? Center(
+        child: CircularProgressIndicator(
+          valueColor:
+          AlwaysStoppedAnimation<Color>(theme.primaryColor),
+        ),
+      )
+          : _entries.isEmpty
+          ? Center(
+        child: Text(
+          'No leaderboard data.',
+          style: TextStyle(
+            fontSize: 16,
+            color: theme.textTheme.bodyMedium!.color,
+          ),
+        ),
+      )
+          : ListView.builder(
+        itemCount: _entries.length,
+        itemBuilder: (context, index) {
+          final entry = _entries[index];
+          final minutes = entry.bestTime ~/ 60;
+          final seconds = entry.bestTime % 60;
+          return ListTile(
+            leading: Text(
+              '${index + 1}',
+              style: TextStyle(
+                fontSize: 20,
+                color: theme.textTheme.bodyMedium!.color,
               ),
-            );
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final List<_UserBest> leaderboard = snapshot.data!;
-
-          if (leaderboard.isEmpty) {
-            return const Center(
-              child: Text(
-                'No records yet.\nBe the first to solve a game!',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16),
+            ),
+            title: Text(
+              entry.username,
+              style: TextStyle(
+                fontSize: 18,
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
               ),
-            );
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: leaderboard.length,
-            separatorBuilder: (c, i) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final entry = leaderboard[index];
-              final rank = index + 1;
-              final formatted = _formatSeconds(entry.timeSpent);
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: const Color(0xFF0D47A1),
-                  child: Text(
-                    '$rank',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-                title: Text(entry.email, style: TextStyle(fontSize: 18)),
-                trailing: Text(formatted, style: const TextStyle(fontSize: 18)),
-              );
-            },
+            ),
+            subtitle: Text(
+              'Best Time: ${minutes}m ${seconds}s',
+              style: TextStyle(
+                color: theme.textTheme.bodySmall!.color,
+                fontSize: 14,
+              ),
+            ),
           );
         },
       ),
     );
   }
-
-  /// convert seconds into MM:SS
-  String _formatSeconds(int total) {
-    final minutes = (total ~/ 60).toString().padLeft(2, '0');
-    final seconds = (total % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
-}
-
-class _UserBest {
-  final String email;
-  final int timeSpent;
-  _UserBest({required this.email, required this.timeSpent});
 }

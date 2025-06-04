@@ -1,0 +1,40 @@
+[33m71914ca[m[33m ([m[1;36mHEAD -> [m[1;32msettings[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m feature: ios lunch screen
+[33m534965b[m Merge branch 'main' of https://github.com/brubin25/mastermind-game
+[33mc7351b0[m fix: content overlap
+[33m27c75aa[m feature: app icon
+[33mb6922e8[m add feature: copy & paste for the Room ID
+[33m8572993[m fix: google login config issuse
+[33m05f8196[m[33m ([m[1;31morigin/two-player-lobby-screen-improvement[m[33m)[m Improve two player lobby screen layout
+[33mf4aeba6[m[33m ([m[1;31morigin/home-screen-improvement[m[33m)[m Improve home screen layout and logic
+[33md6cb25d[m[33m ([m[1;31morigin/signup-screen-improvement[m[33m)[m Improve signup  screen display
+[33me6fb44c[m[33m ([m[1;31morigin/game-mechanics[m[33m)[m Created Game Mechanics
+[33m042cf2e[m[33m ([m[1;31morigin/login-screen-improvement[m[33m)[m Changed header from Login to Mastermind, changed background
+[33mf037daa[m[33m ([m[1;31morigin/settings[m[33m, [m[1;32mmain[m[33m)[m fix: display error; prevent input duplication
+[33m1d266fd[m Update two_player_game_screen.dart
+[33mf605097[m disable: Navigator Settings
+[33m95fab5d[m fix: logic bugs
+[33m5886771[m[33m ([m[1;31morigin/levels[m[33m)[m Add level backgrounds
+[33m0f29864[m Merge pull request #6 from brubin25/multiplayer-mode-NEW
+[33m0d1c7fe[m[33m ([m[1;31morigin/multiplayer-mode-NEW[m[33m)[m add feature: multiplayer mode
+[33maf71388[m feature: show all record
+[33m20c096a[m Merge pull request #5 from brubin25/multiplayer-mode
+[33md25a724[m[33m ([m[1;31morigin/multiplayer-mode[m[33m)[m Update leaderboard_screen.dart
+[33mc0460bf[m feature: ios runner
+[33m6ed75d1[m Merge pull request #4 from brubin25/multiplayer-mode
+[33mf2a0d10[m add feature: leaderboard screen
+[33m65e6333[m add feature: history records
+[33m346f34f[m Merge pull request #3 from brubin25/multiplayer-mode
+[33m3ca3c10[m add feature: + timer; + database
+[33mc7eabe1[m feature: safeareaveiew compactability
+[33m360967d[m Merge pull request #2 from brubin25/signup/login
+[33m0534420[m[33m ([m[1;31morigin/signup/login[m[33m)[m add feature: login/signup page
+[33mee62320[m add feature: GameState - fail; 10 max trial
+[33m2a866b3[m beautify: resize input pegs, add background
+[33mb6227f6[m update: pubspec.yaml & build.gradle.kts
+[33mb277868[m Add navigator drawer and integrate with GameScreen
+[33me740ebf[m Merge pull request #1 from brubin25/basic-game
+[33mc15cb32[m[33m ([m[1;31morigin/basic-game[m[33m)[m basic functions complete, playable
+[33mf0cf827[m + logic + UI
+[33m2d67499[m feature: integral with firebase
+[33m9cf03a3[m folders relocated
+[33mf3b148c[m Flutter standard template

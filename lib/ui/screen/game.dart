@@ -1,617 +1,450 @@
-import 'dart:async';
-import 'dart:math';
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:mastermind_game/models/game_mode.dart';
-import 'package:mastermind_game/ui/screen/components/key_input.dart';
+// lib/ui/screen/game.dart
 
-const int maxRounds = 10;
-typedef OnDeleteFunc = void Function(BuildContext context, int index);
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+
+import '../../models/game_mode.dart';
+import 'game_mechanics_screen.dart';
 
 class GameScreen extends StatefulWidget {
   final GameMode mode;
-
-  const GameScreen({super.key, required this.mode});
+  const GameScreen({Key? key, required this.mode}) : super(key: key);
 
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
 
 class _GameScreenState extends State<GameScreen> {
-  List<KeyInputType> buttons = [];
-  GameState gameState = GameState.playing;
-  List<KeyInputType?> input = [];
+  // ───────── 游戏常量 ─────────
+  static const int maxRounds = 10;
+  static const int startTimeInSeconds = 300; // 倒计时 5 分钟
 
-  List<AnswerType> answers = [];
+  // ───────── 局部状态变量 ─────────
+  late List<String> _secretCode;           // 存储随机生成的 4 个颜色名称
+  List<List<String>> _guessHistory = [];    // 历史每一轮猜测的 List<颜色名称>
+  List<Map<String, int>> _feedbackHistory = []; // 历史反馈：每轮 { 'blackPins': x, 'whitePins': y }
+  List<String> _currentGuess = ['', '', '', '']; // 当前正在填写的 4 格
+  int _currentRound = 0;                    // 当前第几轮
+  int _remainingTime = startTimeInSeconds;  // 剩余秒数
+  Timer? _timer;                            // 定时器
 
-  late int secretCodeLength;
-  late String secretCode;
-  final CollectionReference gamesRef = FirebaseFirestore.instance.collection(
-    'games',
-  );
-  late DocumentReference _currentGameRef;
+  bool _isGameOver = false; // 标记游戏是否结束
+  bool _isVictory = false;  // 标记是否胜利
 
-  // seconds per round
-  static const int _initialTimeSec = 300;
-  // time remaining
-  int _timeRemainingSec = _initialTimeSec;
-  Timer? _roundTimer;
-
-  // show elapsed time instead of countdown
-  // final Stopwatch _stopwatch = Stopwatch();
+  // ───────── Firebase Realtime Database 根引用 ─────────
+  // 注意：firebase_database >= v9.x 用 .ref() 而不是 .reference()
+  final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
 
   @override
   void initState() {
     super.initState();
+    _startNewGame(); // 页面打开时立刻开始新一局
+  }
 
-    assert(
-      widget.mode == GameMode.single,
-      'GameScreen only supports GameMode.single',
+  /// 从头开始初始化一盘游戏
+  void _startNewGame() {
+    // 生成随机密钥
+    _secretCode = _generateRandomCode();
+    // 清空历史
+    _guessHistory.clear();
+    _feedbackHistory.clear();
+    _currentGuess = ['', '', '', ''];
+    _currentRound = 0;
+    _remainingTime = startTimeInSeconds;
+    _isGameOver = false;
+    _isVictory = false;
+
+    // 启动倒计时
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remainingTime > 0) {
+        setState(() {
+          _remainingTime--;
+        });
+      } else {
+        timer.cancel();
+        _onTimeUp(); // 时间到，触发时间结束逻辑
+      }
+    });
+  }
+
+  /// 生成 4 个不重复的随机颜色名称，来自 game_mode.dart 中的 colors 列表
+  List<String> _generateRandomCode() {
+    final allColors = [
+      'red',
+      'blue',
+      'green',
+      'yellow',
+      'purple',
+      'orange'
+    ];
+    allColors.shuffle(); // 随机排序
+    return allColors.take(4).toList();
+  }
+
+  /// 倒计时结束后触发
+  void _onTimeUp() {
+    setState(() {
+      _isGameOver = true;
+      _isVictory = false;
+    });
+    _recordResult(false);      // 记录到数据库为失败
+    _showEndDialog(false);     // 弹出 Game Over 对话框
+  }
+
+  /// 处理用户点击“Submit”按钮时的逻辑
+  void _submitGuess() {
+    // 如果当前还有空格尚未填写，就直接返回
+    if (_currentGuess.any((c) => c == '')) return;
+
+    // 计算反馈信息：黑点 / 白点
+    final feedback = _calculateFeedback(_currentGuess, _secretCode);
+    _guessHistory.add(List.from(_currentGuess));      // 把本轮猜测记录到历史
+    _feedbackHistory.add(feedback);
+    _currentRound++;
+
+    // 如果反馈里 blackPins = 4，则胜利
+    if (feedback['blackPins'] == 4) {
+      _isVictory = true;
+      _isGameOver = true;
+      _timer?.cancel();
+      _recordResult(true);     // 记录为胜利
+      _showEndDialog(true);    // 弹出胜利对话框
+    } else if (_currentRound >= maxRounds) {
+      // 用完最大回合数
+      _isVictory = false;
+      _isGameOver = true;
+      _timer?.cancel();
+      _recordResult(false);
+      _showEndDialog(false);
+    } else {
+      // 进入下一轮，先清空 _currentGuess
+      setState(() {
+        _currentGuess = ['', '', '', ''];
+      });
+    }
+  }
+
+  /// 计算黑点/白点：
+  /// - 黑点（blackPins）：位置和颜色都对
+  /// - 白点（whitePins）：颜色对、位置不对
+  Map<String, int> _calculateFeedback(
+      List<String> guess, List<String> secret) {
+    int blackPins = 0, whitePins = 0;
+    final secretCopy = List<String>.from(secret);
+    final guessCopy = List<String>.from(guess);
+
+    // 先算黑点
+    for (int i = 0; i < 4; i++) {
+      if (guessCopy[i] == secretCopy[i]) {
+        blackPins++;
+        secretCopy[i] = '';
+        guessCopy[i] = '';
+      }
+    }
+    // 再算白点
+    for (int i = 0; i < 4; i++) {
+      if (guessCopy[i] != '' && secretCopy.contains(guessCopy[i])) {
+        whitePins++;
+        secretCopy[secretCopy.indexOf(guessCopy[i])] = '';
+      }
+    }
+    return {'blackPins': blackPins, 'whitePins': whitePins};
+  }
+
+  /// 把本局结果存到 Firebase Realtime Database 下
+  Future<void> _recordResult(bool isVictory) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final timeLeft = _remainingTime;
+    final usedTime = startTimeInSeconds - timeLeft;
+    final recordRef = _dbRef.child('records').child(user.uid).push();
+    await recordRef.set({
+      'gameMode': 'Single',
+      'timeTaken': usedTime,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+    // 同时更新排行榜节点：如果当前成绩优于之前最好成绩，更新之
+    final lbRef = _dbRef.child('leaderboard').child(user.uid);
+    final snapshot = await lbRef.get();
+    if (snapshot.exists) {
+      final existingTime = (snapshot.value as Map)['bestTime'] as int? ?? 999999;
+      if (usedTime < existingTime) {
+        await lbRef.update({'bestTime': usedTime});
+      }
+    } else {
+      await lbRef.set({
+        'username': user.email ?? 'Unknown',
+        'bestTime': usedTime,
+      });
+    }
+  }
+
+  /// 显示游戏结束对话框
+  void _showEndDialog(bool victory) {
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          title: Text(
+            victory ? 'You Win!' : 'Game Over',
+            style: TextStyle(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            victory
+                ? 'Congratulations, you guessed the code!'
+                : 'Better luck next time!\nThe code was: ${_secretCode.join(', ')}',
+            style: TextStyle(color: theme.textTheme.bodyMedium!.color),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();  // 关闭对话框
+                _startNewGame();             // 重新开始一局
+                setState(() {});             // 刷新界面
+              },
+              child: Text(
+                'Play Again',
+                style: TextStyle(color: theme.primaryColor),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.pushReplacementNamed(context, '/home');
+              },
+              child: Text(
+                'Home',
+                style: TextStyle(color: theme.primaryColor),
+              ),
+            ),
+          ],
+        );
+      },
     );
-
-    buttons = createKeyInputTypeList(9);
-    secretCodeLength = 4;
-    _startNewGame();
   }
 
   @override
   void dispose() {
-    _roundTimer?.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Mastermind Game')),
-      body: Container(
+  /// 把“颜色名称”字符串映射到真实的 Color
+  Color _mapColorNameToColor(String name) {
+    switch (name) {
+      case 'red':
+        return Colors.red;
+      case 'blue':
+        return Colors.blue;
+      case 'green':
+        return Colors.green;
+      case 'yellow':
+        return Colors.yellow;
+      case 'purple':
+        return Colors.purple;
+      case 'orange':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  /// 颜色选择小部件：“彩球”按钮，传入颜色名称和点击回调
+  Widget _colorBall(String colorName, VoidCallback onTap) {
+    final ballColor = _mapColorNameToColor(colorName);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/background2.png'),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: SafeArea(
-          child: Flex(
-            direction: Axis.horizontal,
-            children: [_buildMainLayout(context), _buildKeyInput(context)],
-          ),
+          shape: BoxShape.circle,
+          color: ballColor, // 玩法颜色硬编码（不随主题）
         ),
       ),
     );
   }
 
-  _buildKeyInput(BuildContext context) {
-    return Flexible(
-      flex: 2,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Container(
-            margin: EdgeInsets.all(10.0),
-            child: KeyInput(onPressed: handleOnPressed, children: buttons),
-          ),
-        ],
-      ),
-    );
-  }
-
-  _buildMainLayout(BuildContext context) {
-    return Flexible(
-      flex: 8,
-      child: Column(
-        children: [
-          // timer ui
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            color: Colors.transparent,
-            width: double.infinity,
-            child: Center(
-              child: Text(
-                'Time Remaining: $_timeRemainingSec s',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-
-          Expanded(
-            flex: gameState == GameState.playing ? 9 : 8,
-            child: Container(
-              decoration: const BoxDecoration(
-                borderRadius: BorderRadius.only(
-                  bottomRight: Radius.circular(40.0),
-                ),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Answers(answers: answers, maxDigits: secretCodeLength),
-            ),
-          ),
-          Expanded(
-            flex: gameState == GameState.playing ? 1 : 3,
-            child: Container(
-              padding: EdgeInsets.only(
-                top: 10.0,
-                bottom: 10.0,
-                left: 5.0,
-                right: 5.0,
-              ),
-              child: () {
-                switch (gameState) {
-                  case GameState.playing:
-                    return InputComponent(
-                      input: input,
-                      onDelete: handleOnDelete,
-                    );
-                  case GameState.win:
-                    return WinComponent(
-                      answers: answers,
-                      onReset: _startNewGame,
-                    );
-                  case GameState.lose:
-                    return LoseComponent(
-                      onReset: _startNewGame,
-                      secretCode: secretCode,
-                    );
-                }
-              }(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String generateRandomString(int secretCodeLength, bool repeatNumber) {
-    var list = buttons.map((e) => e.value).toList();
-    // remove duplicates
-    if (!repeatNumber) {
-      list.shuffle();
-      var sc = list.sublist(0, secretCodeLength).join();
-      print('=============== Secret code: $sc ===============');
-      return sc;
-    }
-
-    var random = Random();
-    var sb = StringBuffer();
-
-    for (var i = 0; i < secretCodeLength; i++) {
-      sb.write(list[random.nextInt(list.length)]);
-    }
-
-    print('=============== Secret code: ${sb.toString()} ===============');
-    return sb.toString();
-  }
-
-  Future<void> handleOnPressed(BuildContext context, KeyInputType value) async {
-    if (gameState != GameState.playing) return;
-
-    // prevent input duplication
-    final alreadyPicked = input
-        .where((e) => e != null)
-        .any((e) => e!.value == value.value);
-    if (alreadyPicked) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Colors.black87,
-          content: Text(
-            'Each colour should be unique.',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          duration: Duration(milliseconds: 800),
-        ),
-      );
-      return;
-    }
-
-    // fill empty slot
-    final index = input.indexWhere((e) => e == null);
-    setState(() {
-      input[index] = value;
-    });
-
-    // check if all slots are filled
-    final filledCount = input.where((e) => e != null).length;
-    if (filledCount < secretCodeLength) return;
-
-    // evaluate onPlace / misplaced
-    final guess = input.map((e) => e!.value).join();
-    int onPlace = 0, misplaced = 0;
-    for (var i = 0; i < secretCodeLength; i++) {
-      if (guess[i] == secretCode[i]) {
-        onPlace++;
-      } else if (secretCode.contains(guess[i])) {
-        misplaced++;
-      }
-    }
-
-    // update answers, gameState, and reset input
-    setState(() {
-      // new answer
-      answers = [
-        AnswerType(
-          input: input.map((e) => e!).toList(),
-          onPlace: onPlace,
-          misplaced: misplaced,
-        ),
-        ...answers,
-      ];
-    });
-
-    // update game steps
-    try {
-      await _currentGameRef.update({
-        'steps': FieldValue.arrayUnion([
-          {
-            'input': guess,
-            'onPlace': onPlace,
-            'misplaced': misplaced,
-            'createdAt': DateTime.now().millisecondsSinceEpoch,
-          },
-        ]),
-      });
-    } catch (e) {
-      print('Error updating game steps: $e');
-    }
-
-    // win
-    if (onPlace == secretCodeLength) {
-      _roundTimer?.cancel();
-
-      try {
-        await _currentGameRef.update({
-          'remainingTime': _timeRemainingSec,
-          'winOrLose': 'win',
-        });
-      } catch (e) {
-        print('Error updating remainingTime: $e');
-      }
-
-      setState(() {
-        gameState = GameState.win;
-      });
-      return;
-    }
-
-    // lose
-    if (answers.length >= maxRounds) {
-      _roundTimer?.cancel();
-
-      try {
-        await _currentGameRef.update({
-          'remainingTime': _timeRemainingSec,
-          'winOrLose': 'lose',
-        });
-      } catch (e) {
-        print('Error updating remainingTime: $e');
-      }
-
-      setState(() {
-        gameState = GameState.lose;
-      });
-      return;
-    }
-
-    // clear the input for the next guess
-    input = List.filled(secretCodeLength, null);
-  }
-
-  handleOnDelete(BuildContext context, int index) {
-    if (gameState != GameState.playing) {
-      return;
-    }
-
-    setState(() {
-      input[index] = null;
-    });
-  }
-
-  Future<void> _startNewGame() async {
-    // generate a new secret code
-    final newCode = generateRandomString(secretCodeLength, false);
-
-    try {
-      // tie this document to the current user
-      final currentUser = FirebaseAuth.instance.currentUser;
-      final uid = currentUser?.uid;
-
-      _currentGameRef = await gamesRef.add({
-        if (uid != null) 'uid': uid,
-        'email': FirebaseAuth.instance.currentUser!.email,
-        'secretCode': newCode,
-        'codeLength': secretCodeLength,
-        'createdAt': FieldValue.serverTimestamp(),
-        'steps': [],
-        // add remaining time later when the user wins
-      });
-    } catch (e) {
-      print('Error writing secretCode to Firestore: $e');
-    }
-
-    _startTimer();
-
-    // update local state so the UI resets
-    setState(() {
-      answers = [];
-      gameState = GameState.playing;
-      input = List.filled(secretCodeLength, null);
-      secretCode = newCode;
-    });
-  }
-
-  void _startTimer() {
-    // cancel any previous timer
-    _roundTimer?.cancel();
-
-    _timeRemainingSec = _initialTimeSec;
-
-    // new timer
-    _roundTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_timeRemainingSec > 0) {
-        setState(() {
-          _timeRemainingSec--;
-        });
-      } else {
-        // time up
-        timer.cancel();
-        // update Firestore to mark as a loss when timer expires
-        _currentGameRef.update({'winOrLose': 'lose'}).catchError((e) {
-          print('Error writing winOrLose on timeout: $e');
-        });
-
-        setState(() {
-          gameState = GameState.lose;
-        });
-      }
-    });
-  }
-}
-
-class Answers extends StatelessWidget {
-  final List<AnswerType> answers;
-  final int maxDigits;
-  const Answers({super.key, required this.answers, required this.maxDigits});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      reverse: true,
-      itemCount: answers.length,
-      itemBuilder: (context, index) {
-        var answer = answers[index];
-        var spaceBetween = MediaQuery.of(context).size.height * 0.001;
-        var ratio = maxDigits <= 5 ? 60 : 40;
+  /// 当用户点击“某一位置”想替换颜色时，会弹出底部弹窗，让用户选 6 种彩球
+  void _showColorPicker(int index) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
         return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    flex: 8,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children:
-                          answers[index].input
-                              .map(
-                                (e) => SizedBox(
-                                  width: spaceBetween * ratio,
-                                  height: spaceBetween * ratio,
-                                  child: ElementButton(keyInputType: e),
-                                ),
-                              )
-                              .toList(),
+            color: theme.bottomSheetTheme.backgroundColor ?? // 背景随主题
+                theme.canvasColor, // 如果 bottomSheetTheme.backgroundColor 为空，就用 canvasColor 兜底
+            padding: const EdgeInsets.all(16.0),
+            child: GridView.count(
+              crossAxisCount: 3,
+              children: ['red', 'blue', 'green', 'yellow', 'purple', 'orange']
+                  .map((colorName) => GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          setState(() {
+                            _currentGuess[index] = colorName;
+                          });
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.all(8.0),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _mapColorNameToColor(colorName),
+                            border: Border.all(color: theme.dividerColor),
+                          ),
+                          width: 48,
+                          height: 48,
+                        ),
+                      ))
+                          .toList(),
                     ),
-                    // child: Text(answer.input.map((e) => e.value).join('')),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        ...List.generate(2, (rowIndex) {
-                          var maxForRow = maxDigits ~/ 2;
-                          if (maxDigits.isOdd && rowIndex == 0) {
-                            maxForRow++;
-                          }
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              ...List.generate(maxForRow, (columnIndex) {
-                                var number = rowIndex * maxForRow + columnIndex;
-
-                                Color? color;
-                                if (number < answer.onPlace) {
-                                  color = Colors.redAccent[700];
-                                } else if (number <
-                                    answer.onPlace + answer.misplaced) {
-                                  color = Colors.white;
-                                }
-
-                                return Container(
-                                  width: 14,
-                                  height: 14,
-                                  margin: EdgeInsets.only(top: 5),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color:
-                                        color != null
-                                            ? Colors.grey
-                                            : Colors.transparent,
-                                  ),
-                                  child: Container(
-                                    margin: EdgeInsets.all(2),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: color,
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ],
-                          );
-                        }),
-                        // Text('onPlace: ' + answer.onPlace.toString()),
-                        // Text('misplaced: ' + answer.misplaced.toString()),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                height: 1,
-                margin: const EdgeInsets.only(top: 10, left: 10, right: 10),
-                color: Colors.grey,
-              ),
-            ],
-          ),
-        );
+                  );
+          // color: theme.bottomAppBarColor, // 背景随主题
+          // padding: const EdgeInsets.all(16.0),
+          // child: GridView.count(
+          //   crossAxisCount: 3,
+          //   children: ['red', 'blue', 'green', 'yellow', 'purple', 'orange']
+          //       .map((colorName) => GestureDetector(
+          //     onTap: () {
+          //       Navigator.of(context).pop();
+          //       setState(() {
+          //         _currentGuess[index] = colorName;
+          //       });
+          //     },
+          //     child: Container(
+          //       margin: const EdgeInsets.all(8.0),
+          //       decoration: BoxDecoration(
+          //         shape: BoxShape.circle,
+          //         color: _mapColorNameToColor(colorName),
+          //         border: Border.all(color: theme.dividerColor),
+          //       ),
+          //       width: 48,
+          //       height: 48,
+          //     ),
+          //   ))
+          //       .toList(),
+          // ),
+        // );
       },
     );
   }
-}
-
-class WinComponent extends StatelessWidget {
-  final List<AnswerType> answers;
-  final Function() onReset;
-
-  const WinComponent({super.key, required this.answers, required this.onReset});
 
   @override
   Widget build(BuildContext context) {
-    final length = answers.length;
-    final plural = length > 1 ? 'rounds' : 'round';
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        const Center(
-          child: Text(
-            'Congrats! XD',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-        ),
-        Center(
-          child: Text(
-            'You took $length $plural to win.',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w400),
-          ),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            padding: EdgeInsets.symmetric(horizontal: 30.0, vertical: 15.0),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(32.0),
-            ),
-          ),
-          onPressed: () {
-            onReset();
-          },
-          child: const Text(
-            'Play Again',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class LoseComponent extends StatelessWidget {
-  final Function() onReset;
-  final String secretCode;
-
-  const LoseComponent({
-    super.key,
-    required this.onReset,
-    required this.secretCode,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        const Center(
-          child: Text(
-            'Game Over T.T',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-        ),
-        Center(
-          child: Text(
-            'The secret code was $secretCode',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
-          ),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            padding: EdgeInsets.symmetric(horizontal: 30.0, vertical: 15.0),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(32.0),
-            ),
-          ),
-          onPressed: () {
-            onReset();
-          },
-          child: const Text(
-            'Play Again',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class InputComponent extends StatelessWidget {
-  final List<KeyInputType?> input;
-  final OnDeleteFunc onDelete;
-
-  const InputComponent({
-    super.key,
-    required this.input,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.builder(
-      scrollDirection: Axis.horizontal,
-      itemCount: input.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 1,
-        mainAxisSpacing: 10.0,
-        // crossAxisSpacing: 20.0,
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Single Player Game'),
       ),
-      itemBuilder: (context, index) {
-        return MaterialButton(
-          onPressed: () => onDelete(context, index),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          minWidth: 0,
-          height: 0,
-          padding: EdgeInsets.all(3.0),
-          shape: const CircleBorder(),
-          color: Colors.grey.withOpacity(0.5),
-          child:
-              input[index] != null
-                  ? ElementButton(keyInputType: input[index]!)
-                  : null,
-        );
-      },
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // —— 倒计时显示
+            Text(
+              'Time Left: $_remainingTime s',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.error, // 倒计时红色提示
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // —— 当前猜测行：4 个圆球槽，可以点开底部弹窗选择颜色
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: List.generate(4, (index) {
+                final colorName = _currentGuess[index];
+                return GestureDetector(
+                  onTap: _isGameOver
+                      ? null
+                      : () {
+                    _showColorPicker(index);
+                  },
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: theme.dividerColor),
+                      color: colorName.isEmpty
+                          ? Colors.transparent
+                          : _mapColorNameToColor(colorName),
+                    ),
+                  ),
+                );
+              }),
+            ),
+
+            const SizedBox(height: 16),
+
+            // —— Submit 按钮
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.primaryColor,         // 代替过时的 primary
+                  foregroundColor: theme.colorScheme.onPrimary, // 代替过时的 onPrimary
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                onPressed:
+                _isGameOver || _currentGuess.contains('') ? null : _submitGuess,
+                child: const Text('Submit'),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // —— 历史记录列表（每一行显示猜测结果和反馈）
+            Expanded(
+              child: ListView.builder(
+                itemCount: _guessHistory.length,
+                itemBuilder: (context, idx) {
+                  final guess = _guessHistory[idx];
+                  final feedback = _feedbackHistory[idx];
+                  return Card(
+                    color: theme.cardColor,
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: ListTile(
+                      leading: Text(
+                        '${feedback['blackPins']}/${feedback['whitePins']}',
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: theme.textTheme.bodyMedium!.color,
+                        ),
+                      ),
+                      title: Row(
+                        children: guess
+                            .map((colorName) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _mapColorNameToColor(colorName),
+                            ),
+                          ),
+                        ))
+                            .toList(),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

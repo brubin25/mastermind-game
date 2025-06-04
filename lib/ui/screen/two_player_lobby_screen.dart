@@ -1,334 +1,185 @@
-import 'dart:math';
+// lib/ui/screen/two_player_lobby_screen.dart
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'two_player_game_screen.dart';
-import 'package:mastermind_game/models/game_mode.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class TwoPlayerLobbyScreen extends StatefulWidget {
-  const TwoPlayerLobbyScreen({super.key});
+  const TwoPlayerLobbyScreen({Key? key}) : super(key: key);
 
   @override
   State<TwoPlayerLobbyScreen> createState() => _TwoPlayerLobbyScreenState();
 }
 
 class _TwoPlayerLobbyScreenState extends State<TwoPlayerLobbyScreen> {
-  final TextEditingController _joinController = TextEditingController();
-  final CollectionReference _gamesRef = FirebaseFirestore.instance.collection(
-    'games',
-  );
-
-  String? _errorText;
-  bool _isLoading = false;
+  final _dbRef = FirebaseDatabase.instance.ref();
+  String? _roomId;
+  bool _isWaiting = false;
+  StreamSubscription<DatabaseEvent>? _roomSubscription;
 
   @override
   void dispose() {
-    _joinController.dispose();
+    _roomSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _createRoom() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final newRoomRef = _dbRef.child('rooms').push();
+    final roomKey = newRoomRef.key!;
+    await newRoomRef.set({
+      'host': user.uid,
+      'guest': '',
+      'hostGuess': [],
+      'guestGuess': [],
+    });
     setState(() {
-      _isLoading = true;
-      _errorText = null;
+      _roomId = roomKey;
+      _isWaiting = true;
     });
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      setState(() {
-        _errorText = 'You must be signed in to create a room.';
-        _isLoading = false;
-      });
-      return;
-    }
-
-    final uid = user.uid;
-    final secretCode = _generateRandomString(4, repeatsAllowed: false);
-    print('=============== secret code: $secretCode ===============');
-
-    try {
-      final docRef = await _gamesRef.add({
-        'secretCode': secretCode,
-        'codeLength': 4,
-        'player1': uid,
-        'player2': null,
-        'currentPlayer': 'P1',
-        'stepsP1': [],
-        'stepsP2': [],
-        'winner': null,
-        'remainingTime': 300,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      final roomId = docRef.id;
-
-      setState(() => _isLoading = false);
-
-      await showDialog(
-        context: context,
-        builder:
-            (ctx) => AlertDialog(
-              title: const Text('Room Created'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Share this Room ID with Player 2:',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: SelectableText(
-                          roomId,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.blueAccent,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      // Copy button
-                      IconButton(
-                        icon: const Icon(Icons.copy, color: Colors.blueAccent),
-                        tooltip: 'Copy to clipboard',
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: roomId));
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(
-                              content: Text('Room ID copied to clipboard'),
-                              duration: Duration(milliseconds: 800),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-      );
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder:
-              (_) =>
-                  TwoPlayerGameScreen(mode: GameMode.twoPlayer, gameId: roomId),
-        ),
-      );
-    } catch (e) {
-      setState(() {
-        _errorText = 'Error creating room: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _joinRoom() async {
-    final roomId = _joinController.text.trim();
-    if (roomId.isEmpty) {
-      setState(() => _errorText = 'Please enter a room ID.');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorText = null;
+    // 监听 guest 字段，一旦有人加入就跳转到 game screen
+    _roomSubscription = newRoomRef.onValue.listen((event) {
+      final data = event.snapshot.value as Map<dynamic, dynamic>?;
+      if (data != null) {
+        final guest = data['guest'] as String? ?? '';
+        if (guest.isNotEmpty) {
+          Navigator.of(context).pushReplacementNamed(
+            '/two_player_game',
+            arguments: roomKey,
+          );
+        }
+      }
     });
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      setState(() {
-        _errorText = 'You must be signed in to join a room.';
-        _isLoading = false;
-      });
-      return;
-    }
-
-    final uid = user.uid;
-    final docRef = _gamesRef.doc(roomId);
-
-    try {
-      final snapshot = await docRef.get();
-      if (!snapshot.exists) {
-        setState(() {
-          _errorText = 'Room "$roomId" does not exist.';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final data = snapshot.data() as Map<String, dynamic>;
-      if (data['player2'] != null) {
-        setState(() {
-          _errorText = 'Room "$roomId" is already full.';
-          _isLoading = false;
-        });
-        return;
-      }
-      if (data['player1'] == uid) {
-        setState(() {
-          _errorText = 'You are already Player 1 in this room.';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      await docRef.update({'player2': uid});
-      setState(() => _isLoading = false);
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder:
-              (_) =>
-                  TwoPlayerGameScreen(mode: GameMode.twoPlayer, gameId: roomId),
-        ),
-      );
-    } catch (e) {
-      setState(() {
-        _errorText = 'Error joining room: $e';
-        _isLoading = false;
-      });
-    }
   }
 
-  String _generateRandomString(int length, {bool repeatsAllowed = true}) {
-    final digits = List<String>.generate(9, (i) => (i + 1).toString());
-    if (!repeatsAllowed) {
-      digits.shuffle();
-      return digits.sublist(0, length).join();
+  Future<void> _joinRoom(String roomIdInput) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final roomRef = _dbRef.child('rooms').child(roomIdInput);
+    final snapshot = await roomRef.once();
+    if (snapshot.snapshot.value != null) {
+      // 更新 guest 字段
+      await roomRef.update({'guest': user.uid});
+      Navigator.of(context).pushReplacementNamed(
+        '/two_player_game',
+        arguments: roomIdInput,
+      );
+    } else {
+      // 提示房间不存在
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Room not found!',
+            style: TextStyle(color: Theme.of(context).colorScheme.onError),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
     }
-    final rnd = Random();
-    final sb = StringBuffer();
-    for (var i = 0; i < length; i++) {
-      sb.write(digits[rnd.nextInt(digits.length)]);
-    }
-    return sb.toString();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Two-Player Lobby')),
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/background6.png'),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: _isLoading ? null : _createRoom,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(60),
-                  backgroundColor: const Color(0xFF0D47A1),
-                ),
-                child:
-                    _isLoading
-                        ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                        : const Text(
-                          'Create Room',
-                          style: TextStyle(fontSize: 20, color: Colors.white),
-                        ),
-              ),
-
-              const SizedBox(height: 100),
-              const Text(
-                '— OR —',
+      appBar: AppBar(
+        title: const Text('Two Player Lobby'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            if (_roomId == null) ...[
+              Text(
+                'Enter Room ID to Join:',
                 style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
                   fontSize: 18,
+                  color: theme.textTheme.bodyMedium!.color,
                 ),
               ),
-              const SizedBox(height: 32),
-
+              const SizedBox(height: 8),
               TextField(
-                controller: _joinController,
-                style: const TextStyle(
-                  color: Colors.blueAccent,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
                 decoration: InputDecoration(
-                  labelText: 'Enter Room ID',
-                  labelStyle: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(color: theme.dividerColor),
                   ),
-                  errorText: _errorText,
-                  border: const OutlineInputBorder(),
-                  focusedBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white),
+                  hintText: 'Room ID',
+                  hintStyle: TextStyle(color: theme.hintColor),
+                ),
+                style: TextStyle(color: theme.textTheme.bodyMedium!.color),
+                onChanged: (val) {
+                  setState(() {
+                    _roomId = val.trim();
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.primaryColor,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  enabledBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white),
-                  ),
-                  // add a Paste icon to the TextField so users can tap to paste from clipboard
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.paste, color: Colors.white),
-                    tooltip: 'Paste from clipboard',
-                    onPressed: () async {
-                      final data = await Clipboard.getData('text/plain');
-                      if (data?.text != null) {
-                        _joinController.text = data!.text!;
-                      }
-                    },
+                  onPressed:
+                  (_roomId == null || _roomId!.isEmpty) ? null : () => _joinRoom(_roomId!),
+                  child: const Text(
+                    'Join Room',
+                    style: TextStyle(fontSize: 16),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _joinRoom,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(60),
-                  backgroundColor: const Color(0xFF0D47A1),
+              const SizedBox(height: 24),
+              Divider(color: theme.dividerColor),
+              const SizedBox(height: 24),
+              Text(
+                'Or create a new room:',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: theme.textTheme.bodyMedium!.color,
                 ),
-                child:
-                    _isLoading
-                        ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                        : const Text(
-                          'Join Room',
-                          style: TextStyle(fontSize: 20, color: Colors.white),
-                        ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.secondary,
+                    foregroundColor: theme.colorScheme.onSecondary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: _createRoom,
+                  child: const Text(
+                    'Create Room',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+            ] else if (_isWaiting) ...[
+              Text(
+                'Waiting for opponent...',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: theme.colorScheme.error,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Room ID: $_roomId',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: theme.textTheme.bodySmall!.color,
+                ),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );

@@ -1,182 +1,146 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+// lib/ui/screen/record_screen.dart
+
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
-import 'package:mastermind_game/models/game_mode.dart';
-import 'package:mastermind_game/ui/screen/game.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+
+class Record {
+  final String gameMode;
+  final int timeTaken;
+  final DateTime timestamp;
+
+  Record({
+    required this.gameMode,
+    required this.timeTaken,
+    required this.timestamp,
+  });
+}
 
 class RecordScreen extends StatefulWidget {
-  const RecordScreen({super.key});
+  const RecordScreen({Key? key}) : super(key: key);
 
   @override
   State<RecordScreen> createState() => _RecordScreenState();
 }
 
 class _RecordScreenState extends State<RecordScreen> {
-  static const int _initialTimeSec = 300;
-  late final String _uid;
+  final _dbRef = FirebaseDatabase.instance.ref();
+  List<Record> _records = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _fetchRecords();
+  }
+
+  Future<void> _fetchRecords() async {
     final user = FirebaseAuth.instance.currentUser;
-    _uid = user?.uid ?? '';
+    if (user == null) {
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      // final snapshot = await _dbRef.child('records').child(user.uid).once();
+      // final data = snapshot.value as Map<dynamic, dynamic>?;
+      DataSnapshot snapshot = await _dbRef.child(user.uid).get();
+
+      final data = snapshot.value as Map<dynamic, dynamic>?;
+      if (data != null) {
+        final List<Record> temp = [];
+        data.forEach((key, value) {
+          final gameMode = value['gameMode'] as String? ?? '';
+          final time = value['timeTaken'] as int? ?? 0;
+          final ts = value['timestamp'] as int? ?? 0;
+          temp.add(Record(
+            gameMode: gameMode,
+            timeTaken: time,
+            timestamp: DateTime.fromMillisecondsSinceEpoch(ts),
+          ));
+        });
+        // 按时间倒序排列
+        temp.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        setState(() {
+          _records = temp;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e){
+      // Capture errors (network, permissions, etc.)
+      setState(() {
+        _records = [];
+        _isLoading = false;
+      });
+
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_uid.isEmpty) {
-      return const Scaffold(
-        body: Center(
-          child: Text('You must be signed in to view your records.'),
-        ),
-      );
-    }
-
-    final gamesQuery = FirebaseFirestore.instance
-        .collection('games')
-        .where('uid', isEqualTo: _uid)
-        .orderBy('createdAt', descending: true);
-
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('My History')),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: gamesQuery.snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Error loading records: ${snapshot.error}'),
-            );
-          }
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final docs = snapshot.data!.docs;
-
-          if (docs.isEmpty) {
-            return const Center(
-              child: Text(
-                'No games found.\nPlay a round to see it here!',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16),
+      appBar: AppBar(
+        title: const Text('My History'),
+      ),
+      body: _isLoading
+          ? Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
+        ),
+      )
+          : _records.isEmpty
+          ? Center(
+        child: Text(
+          'No records yet!',
+          style: TextStyle(
+            fontSize: 16,
+            color: theme.textTheme.bodyMedium!.color,
+          ),
+        ),
+      )
+          : ListView.builder(
+        itemCount: _records.length,
+        itemBuilder: (context, index) {
+          final record = _records[index];
+          final minutes = record.timeTaken ~/ 60;
+          final seconds = record.timeTaken % 60;
+          return Card(
+            color: theme.cardColor,
+            margin:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: ListTile(
+              leading: Icon(
+                Icons.history,
+                color: theme.colorScheme.primary,
               ),
-            );
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            itemCount: docs.length,
-            separatorBuilder: (context, index) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final doc = docs[index];
-              final data = doc.data() as Map<String, dynamic>;
-
-              final Timestamp ts = data['createdAt'] as Timestamp;
-              final DateTime date = ts.toDate();
-
-              final steps = (data['steps'] as List<dynamic>?) ?? [];
-              final String winOrLose = (data['winOrLose'] as String?) ?? 'lose';
-              final bool isWon = winOrLose == 'win';
-              final int remaining = (data['remainingTime'] as int?) ?? 0;
-              final int spentSec = _initialTimeSec - remaining;
-              final String formattedTime = _formatSeconds(spentSec);
-
-              final String outcome = isWon ? 'WON' : 'LOST';
-              final String title =
-                  '$outcome in ${steps.length} steps, spent $formattedTime.';
-
-              return ListTile(
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder:
-                        (context) => AlertDialog(
-                          title: const Text('Game Details'),
-                          content: SizedBox(
-                            width: MediaQuery.of(context).size.width * 0.8,
-                            height: MediaQuery.of(context).size.height * 0.6,
-                            child: Answers(
-                              answers:
-                                  steps
-                                      .map((step) => AnswerType.fromJson(step))
-                                      .toList(),
-                              maxDigits: 4,
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Close'),
-                            ),
-                          ],
-                        ),
-                  );
-                },
-                leading: Lottie.asset(
-                  isWon
-                      ? 'assets/images/victory.json'
-                      : 'assets/images/lose.json',
-                  width: 45,
-                  height: 45,
-                  fit: BoxFit.fill,
+              title: Text(
+                record.gameMode,
+                style: TextStyle(
+                  color: theme.textTheme.bodyMedium!.color,
+                  fontWeight: FontWeight.bold,
                 ),
-                title: Text(title, style: const TextStyle(fontSize: 18)),
-                trailing:
-                    isWon
-                        ? Lottie.asset(
-                          'assets/images/confetti.json',
-                          width: 45,
-                          height: 45,
-                          fit: BoxFit.cover,
-                        )
-                        : null,
-                subtitle: Text(
-                  'Played on ${_formatDateTime(date)}',
-                  style: const TextStyle(fontSize: 14, color: Colors.white70),
+              ),
+              subtitle: Text(
+                'Time: ${minutes}m ${seconds}s\n'
+                    'Played on: ${record.timestamp.year}-${record.timestamp.month.toString().padLeft(2, '0')}-${record.timestamp.day.toString().padLeft(2, '0')} '
+                    '${record.timestamp.hour.toString().padLeft(2, '0')}:${record.timestamp.minute.toString().padLeft(2, '0')}',
+                style: TextStyle(
+                  color: theme.textTheme.bodySmall!.color,
+                  fontSize: 14,
                 ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-              );
-            },
+              ),
+              isThreeLine: true,
+            ),
           );
         },
       ),
     );
-  }
-
-  String _formatSeconds(int total) {
-    final minutes = (total ~/ 60).toString().padLeft(2, '0');
-    final seconds = (total % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
-
-  String _formatDateTime(DateTime dt) {
-    final month = _monthName(dt.month);
-    final day = dt.day;
-    final year = dt.year;
-    final hour = dt.hour.toString().padLeft(2, '0');
-    final minute = dt.minute.toString().padLeft(2, '0');
-    return '$month $day, $year at $hour:$minute';
-  }
-
-  String _monthName(int monthIndex) {
-    const names = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return names[monthIndex - 1];
   }
 }

@@ -1,8 +1,12 @@
+// lib/ui/screen/signup_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'login_screen.dart';
+
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  const SignupScreen({Key? key}) : super(key: key);
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -16,135 +20,168 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isLoading = false;
 
   Future<void> _signup() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-    final confirm = _confirmController.text;
-
-    if (password != confirm) {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    if (_passwordController.text != _confirmController.text) {
       setState(() {
-        _errorMessage = 'Passwords do not match.';
+        _errorMessage = 'Passwords do not match';
+        _isLoading = false;
       });
       return;
     }
-
-    setState(() {
-      _errorMessage = null;
-      _isLoading = true;
-    });
-
     try {
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
-      if (mounted) Navigator.of(context).pop();
+      Navigator.pushReplacementNamed(context, '/home');
     } on FirebaseAuthException catch (e) {
       setState(() {
-        switch (e.code) {
-          case 'email-already-in-use':
-            _errorMessage = 'That email is already in use.';
-            break;
-          case 'weak-password':
-            _errorMessage = 'The password is too weak.';
-            break;
-          default:
-            _errorMessage = e.message;
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'An unexpected error occurred.';
-      });
-    } finally {
-      setState(() {
+        _errorMessage = e.message;
         _isLoading = false;
       });
     }
   }
 
   @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign Up')),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/background4.png',
-              fit: BoxFit.cover,
-            ),
-          ),
-          Container(color: Colors.black.withOpacity(0.6)),
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                const SizedBox(height: 60),
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    labelStyle: TextStyle(color: Colors.white),
-                    enabledBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white38),
-                    ),
+      appBar: AppBar(
+        title: const Text('Sign Up'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // 错误消息
+              if (_errorMessage != null)
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(
+                    color: theme.colorScheme.error,
+                    fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    labelStyle: TextStyle(color: Colors.white),
-                    enabledBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white38),
-                    ),
+
+              const SizedBox(height: 16),
+
+              // Email 输入
+              TextFormField(
+                controller: _emailController,
+                decoration: InputDecoration(
+                  labelText: 'Email',
+                  labelStyle: TextStyle(color: theme.hintColor),
+                  hintText: 'Enter your email',
+                  hintStyle: TextStyle(color: theme.hintColor),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: theme.dividerColor),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: theme.primaryColor),
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _confirmController,
-                  obscureText: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm Password',
-                    labelStyle: TextStyle(color: Colors.white),
-                    enabledBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white38),
-                    ),
+                keyboardType: TextInputType.emailAddress,
+                style: TextStyle(color: theme.textTheme.bodyMedium!.color),
+              ),
+              const SizedBox(height: 16),
+
+              // Password 输入
+              TextFormField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  labelStyle: TextStyle(color: theme.hintColor),
+                  hintText: 'Enter your password',
+                  hintStyle: TextStyle(color: theme.hintColor),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: theme.dividerColor),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: theme.primaryColor),
                   ),
                 ),
-                const SizedBox(height: 16),
-                if (_errorMessage != null)
-                  Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
-                const SizedBox(height: 12),
-                ElevatedButton(
+                style: TextStyle(color: theme.textTheme.bodyMedium!.color),
+              ),
+              const SizedBox(height: 16),
+
+              // Confirm Password 输入
+              TextFormField(
+                controller: _confirmController,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Confirm Password',
+                  labelStyle: TextStyle(color: theme.hintColor),
+                  hintText: 'Re-enter your password',
+                  hintStyle: TextStyle(color: theme.hintColor),
+                  enabledBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: theme.dividerColor),
+                  ),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: theme.primaryColor),
+                  ),
+                ),
+                style: TextStyle(color: theme.textTheme.bodyMedium!.color),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Sign Up 按钮
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.primaryColor,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
                   onPressed: _isLoading ? null : _signup,
                   child: _isLoading
-                      ? const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ? SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        theme.colorScheme.onPrimary,
+                      ),
+                    ),
                   )
                       : const Text(
                     'Sign Up',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                    style: TextStyle(fontSize: 16),
                   ),
                 ),
-              ],
-            ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // 去 Login 页面
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Already have an account?',
+                    style: TextStyle(color: theme.textTheme.bodyMedium!.color),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pushReplacementNamed(context, '/login');
+                    },
+                    child: Text(
+                      'Login',
+                      style: TextStyle(color: theme.primaryColor),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
